@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema(
             enum: ['user', 'admin'],
             default: 'user'
         },
-        email_verified: {
+        emailVerified: {
             type: Boolean,
             default: false
         },
@@ -42,8 +42,10 @@ const userSchema = new mongoose.Schema(
             type: Boolean,
             default: false
         },
-        banned_reason: String,
-        banned_until: Date,
+        bannedReason: String,
+        bannedUntil: Date,
+        resetPasswordToken: String,
+        resetPasswordExpire: Date,
     },
     {
         timestamps: true
