@@ -21,8 +21,8 @@ export const signup = async (req: Request, res: Response) => {
         // Kiểm tra mail có tồn tại chưa
         if (existEmail) {
             res.status(409).json({
-                code: 409,
-                message: "Email đã tồn tại!"
+                success: false,
+                error: "Email đã tồn tại!"
             });
             return;
         }
@@ -30,8 +30,8 @@ export const signup = async (req: Request, res: Response) => {
         // Kiểm tra displayName có tồn tại chưa
         if (existDisplayName) {
             res.status(409).json({
-                code: 409,
-                message: "Tên hiển thị đã bị trùng!"
+                success: false,
+                error: "Tên hiển thị đã bị trùng!"
             });
             return;
         }
@@ -60,18 +60,19 @@ export const signup = async (req: Request, res: Response) => {
 
         // Gửi data cho Frontend
         res.status(201).json({
-            code: 201,
-            message: "Đăng ký thành công",
-            id: newUser._id,
-            email: newUser.email,
-            displayName: newUser.displayName,
-            token: token
+            success: true,
+            data: {        // Bọc vào 'data' để khớp với 'response.data?.token'
+                id: newUser._id,
+                email: newUser.email,
+                displayName: newUser.displayName,
+                token: token
+            }
         });
     } catch (error) {
         console.log("[Aignup error:]", error);
         return res.status(500).json({
-            code: 500,
-            message: "Lỗi hệ thống, vui lòng thử lại sau!"
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
         });
     }
 
