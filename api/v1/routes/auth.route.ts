@@ -5,5 +5,7 @@ const route: Router = Router();
 
 route.post('/signup', controller.signup);
 route.post('/login', controller.login);
+route.post('/forgot-password', controller.forgotPassword);
+route.post('/reset-password', controller.resetPassword);
 
 export const authRoute: Router = route;
