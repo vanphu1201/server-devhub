@@ -263,7 +263,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
         console.log("[Error Forgot password: ]", error);
         res.status(500).json({
             success: false,
-            error: "LỖi hệ thống, vui lòng thử lại sau!"
+            error: "lỗi hệ thống, vui lòng thử lại sau!"
         });
         return;
     }
@@ -271,5 +271,56 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
 // [POST] /api/v1/auth/reset-password
 export const resetPassword = async (req: Request, res: Response) => {
+    try {
+        // Kiểm tra có đủ token với newPassword hay không
+        const { token, newPassword } = req.body;
+        if (!token || !newPassword) {
+            res.status(400).json({
+                success: false,
+                error: "Thiếu token hoặc mật khẩu mới!"
+            });
+            return;
+        }
 
+        // Kiểm tra token có hợp lệ hoặc quá hạn không
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpire: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            res.status(400).json({
+                success: false,
+                error: "Token không hợp lệ hoặc hết hạn!"
+            });
+            return;
+        }
+
+        // mã hóa newPassword
+        const saltRounds = 10;
+        user.password = await bcrypt.hash(newPassword, saltRounds);
+
+        // Xóa token và hạn của token
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpire = undefined;
+
+        // Lưu vào database
+        await user.save();
+
+        // Trả data về cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "reset password thành công!"
+            }
+        });
+        return;
+    } catch (error) {
+        console.log("[Reset password Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
 }
