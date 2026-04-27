@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
+import { AuthRequest } from "../middlewares/auth.middleware";
 
 const JWT_SECRET = process.env.JWT_SECRET as string || "super_secret_for_devhub_120107";
 const JWT_EXPIRE = process.env.JWT_EXPIRE as any || "7d";
@@ -323,4 +324,83 @@ export const resetPassword = async (req: Request, res: Response) => {
         });
         return;
     }
+}
+
+// [POST] /api/v1/auth/update-password
+export const updatePassword = async (req: AuthRequest, res: Response) => {
+    try {
+
+        // kiểm tra xem có xác thực thành công chưa (có chạy qua auth.middleware chưa)
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Không tìm thấy thông tin xác thực, vui lòng đăng nhập lại!"
+            });
+            return;
+        }
+
+        const { currentPassword, newPassword } = req.body;
+        // Kiểm tra client có gửi đủ mật khẩu cũ và mới
+        if (!currentPassword || !newPassword) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng nhập đầy đủ mật khẩu cũ và mật khẩu mới!"
+            });
+            return;
+        }
+
+        // kiểm tra mật khẩu cũ có khống mật khẩu mới không
+        if (currentPassword === newPassword) {
+            res.status(400).json({
+                success: false,
+                error: "Mật khẩu mới không được trùng với mật khẩu cũ!"
+            });
+            return;
+        }
+
+
+        // Lấy user từ database
+        const user = await User.findOne({_id: userId});
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                error: "Không tìm thấy tài khoản người dùng!"
+            });
+            return;
+        } 
+
+        // so sánh mật khkhaaurux có khớp với database không
+        const isComparePassword = await bcrypt.compare(currentPassword, user.password as string);
+        if (!isComparePassword) {
+            res.status(401).json({
+                success: false,
+                error: "Mật khẩu không chính xác!"
+            });
+            return;
+        }
+
+        // Mã hóa mật khẩu mới rồi lưu vào database
+        const saltRounds = 10;
+        user.password = await bcrypt.hash(newPassword as string, saltRounds);
+
+        await user.save();
+
+        // Trả data về client
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "Cập nhập mật khẩu thành công!"
+            }
+        });
+        return;
+    } catch (error) {
+        console.log("[Update password Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+
 }
