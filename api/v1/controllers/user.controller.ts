@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import User from "../modules/users.module";
 import Post from "../modules/posts.module";
 import mongoose from "mongoose";
+import { AuthRequest } from "../middlewares/auth.middleware";
 
 // [GET] /api/v1/users/:identifier
 export const identifier = async (req: Request, res: Response) => {
@@ -60,6 +61,59 @@ export const identifier = async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             error: "LỖi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+
+// [PUT] /api/v1/users/profile
+export const profile = async (req: AuthRequest, res: Response) => {
+    try {
+        // Kiểm tra có vượt qua requireAuth middleware chưa
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Không tìm thấy thông tin xác thực, vui lòng đăng nhập lại!"
+            });
+            return;
+        }
+
+        // Lấy dữ liệu từ client để upd
+        const { displayName, avatar, cover, bio, skills } = req.body;
+        const updateData = { displayName, avatar, cover, bio, skills };
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            updateData,
+            {
+                new: true, // Bắt Mongoose trả về data MỚI sau khi update
+                runValidators: true // Ép Mongoose chạy lại các kiểm tra (như enum, required...) trong Schema
+            }
+        ).select("-password -isBanned -bannedReason -bannedUntil -resetPasswordToken -resetPasswordExpire -__v");
+
+        if (!updatedUser) {
+            res.status(404).json({
+                success: false,
+                error: "Không tìm thấy người dùng!"
+            });
+            return;
+        }
+
+        // Trả data về cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "Cập nhập Profile thành công!",
+                user: updatedUser
+            }
+        })
+    } catch (error) {
+        console.log("[Update Profile Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
         });
         return;
     }
