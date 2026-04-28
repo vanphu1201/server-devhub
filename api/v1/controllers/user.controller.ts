@@ -1,21 +1,29 @@
 import { Request, Response } from "express";
 import User from "../modules/users.module";
 import Post from "../modules/posts.module";
+import mongoose from "mongoose";
 
-
-// [GET] /api/v1/users/:userId
-export const profileById = async (req: Request, res: Response) => {
+// [GET] /api/v1/users/:identifier
+export const identifier = async (req: Request, res: Response) => {
     try {
-        const userId: string = req.params?.userId as string;
-        if (!userId) {
+        const identifier: string = req.params.identifier as string;
+
+        if (!identifier) {
             res.status(400).json({
                 success: false,
-                error: "Thiếu tham số userId trên URL!"
+                error: "Thiếu tham số định danh trên URL!"
             });
             return;
         }
 
-        const user = await User.findOne({_id: userId }).select("-password -isBanned -bannedReason -bannedUntil -resetPasswordToken -resetPasswordExpire -__v");
+        // Gán đúng giá trị cho param clien đưa lên
+        const query = mongoose.isValidObjectId(identifier)
+            ? { $or: [{ _id: identifier }, { username: identifier }] }
+            : { username: identifier };
+
+        const user = await User.findOne(query)
+            .select("-password -isBanned -bannedReason -bannedUntil -resetPasswordToken -resetPasswordExpire -__v");
+
         if (!user) {
             res.status(404).json({
                 success: false,
@@ -24,7 +32,7 @@ export const profileById = async (req: Request, res: Response) => {
             return;
         }
 
-        const postsCount = await Post.countDocuments({ author: userId });
+        const postsCount = await Post.countDocuments({ author: user.id });
         //const productsCount = await Product.countDocuments({ author: userId });
         const userObj = user.toObject();
         res.status(200).json({
@@ -47,7 +55,6 @@ export const profileById = async (req: Request, res: Response) => {
             }
         });
         return;
-
     } catch (error) {
         console.log("[Get Profile User Error: ]", error);
         res.status(500).json({
