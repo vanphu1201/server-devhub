@@ -4,23 +4,32 @@ const postSchema = new mongoose.Schema(
     {
         content: {
             type: String,
-            require: true
+            required: true
         },
         images: Array,
         author: {
             type: String,
-            require: true
+            required: true
         },
         likes: Array,
         likesCount: Number,
         comments: Array,
-        commentsCount: Number,
+        commentsCount: {
+            type: Number,
+            default: 0
+        },
         bookmarks: Array,
-        bookmarksCount: Number,
-        shares: Number,
+        bookmarksCount: {
+            type: Number,
+            default: 0
+        },
+        shares: {
+            type: Number,
+            default: 0
+        },
         visibility: {
             type: String,
-            enum: [" public", "private"],
+            enum: ["public", "private"],
             default: "public"
         }
     },
@@ -29,5 +38,5 @@ const postSchema = new mongoose.Schema(
 }
 );
 
-const Post = mongoose.model('Post', postSchema, "users");
+const Post = mongoose.model('Post', postSchema, "posts");
 export default Post;
