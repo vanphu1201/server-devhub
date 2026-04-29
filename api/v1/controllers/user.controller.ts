@@ -217,6 +217,12 @@ export const follow = async (req: ExtendRequest, res: Response) => {
             return;
         }
 
+        // Chặn lỗi do truyền id không hợp lệ
+        if (!mongoose.isValidObjectId(userId)) {
+            res.status(400).json({ success: false, error: "ID người dùng không hợp lệ!" });
+            return;
+        }
+
         // Kiêm tra userId truyền lên có hợp lệ không
         const user = await User.findById(userId);
         if (!user) {
@@ -234,12 +240,12 @@ export const follow = async (req: ExtendRequest, res: Response) => {
         }
 
         await Promise.all([
-            User.findByIdAndUpdate(myUserId, { 
-                $addToSet: { following: userId } 
+            User.findByIdAndUpdate(myUserId, {
+                $addToSet: { following: userId }
             }),
-            
-            User.findByIdAndUpdate(userId, { 
-                $addToSet: { followers: myUserId } 
+
+            User.findByIdAndUpdate(userId, {
+                $addToSet: { followers: myUserId }
             })
         ]);
 
@@ -263,3 +269,79 @@ export const follow = async (req: ExtendRequest, res: Response) => {
         return;
     }
 }
+
+// [DELETE] /api/v1/users/:userId/follow
+export const unFollow = async (req: ExtendRequest, res: Response) => {
+    try {
+        const myUserId = req.user?.id;
+        const userId = req.params?.userId;
+        // Kiểm tra có vượt qua middleware chưa
+        if (!myUserId) {
+            res.status(401).json({
+                success: false,
+                error: "Bạn chưa đăng nhập!"
+            });
+            return;
+        }
+        // Kieemrr tra client có gửi userId lên param chưa
+        if (!userId) {
+            res.status(400).json({
+                success: false,
+                error: "Chưa chuyền userId lên params!"
+            });
+            return;
+        }
+
+        // Chặn lỗi do truyền id không hợp lệ
+        if (!mongoose.isValidObjectId(userId)) {
+            res.status(400).json({ success: false, error: "ID người dùng không hợp lệ!" });
+            return;
+        }
+
+        // Kiêm tra userId truyền lên có hợp lệ không
+        const user = await User.findById(userId);
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                error: "User id gửi lên không hợp lệ!"
+            });
+            return;
+        }
+
+        // Chặn lỗi tự unfollow bản thân
+        if (myUserId.toString() === userId.toString()) {
+            res.status(400).json({ success: false, error: "Bạn không thể tự hủy theo dõi chính mình!" });
+            return;
+        }
+
+        await Promise.all([
+            User.findByIdAndUpdate(myUserId, {
+                $pull: { following: userId }
+            }),
+
+            User.findByIdAndUpdate(userId, {
+                $pull: { followers: myUserId }
+            })
+        ]);
+
+        // Trả data về cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                "message": "User unfollowed",
+                "isFollowing": false
+            }
+        });
+        return;
+
+
+    } catch (error) {
+        console.log("[UnFollowing Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+

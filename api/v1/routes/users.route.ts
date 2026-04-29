@@ -25,5 +25,7 @@ route.post(
     controller.cover
 );
 route.post('/:userId/follow', requireAuth, controller.follow);
+route.delete('/:userId/follow', requireAuth, controller.unFollow);
+
 
 export const usersRoute: Router = route;
