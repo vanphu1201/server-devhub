@@ -157,6 +157,44 @@ export const avatar = async (req: ExtendRequest, res: Response) => {
     }
 }
 
+// [POST] /api/v1/users/cover
+export const cover = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const coverUrl: string = req.body.cover as string;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+        // Lưu link vào Database
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { cover: coverUrl },
+            { new: true }
+        ).select("-password -__v");
+
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "Cập nhật ảnh bìa thành công!",
+                url: coverUrl,
+                user: updatedUser
+            }
+        });
+
+    } catch (error) {
+        console.error("[Upload Cover Error:]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi tải ảnh lên!"
+        });
+        return;
+    }
+}
+
 // [POST] /api/v1/users/:userId/follow
 export const follow = async (req: ExtendRequest, res: Response) => {
     try {

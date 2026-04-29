@@ -17,6 +17,13 @@ route.post(
     uploadCloud,
     controller.avatar
 );
+route.post(
+    '/cover',
+    requireAuth,
+    upload.single("cover"),
+    uploadCloud,
+    controller.cover
+);
 route.post('/:userId/follow', requireAuth, controller.follow);
 
 export const usersRoute: Router = route;

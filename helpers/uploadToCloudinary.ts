@@ -1,10 +1,6 @@
 import { v2 as cloudinary, UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
 import streamifier from 'streamifier';
 
-console.log(process.env.API_KEY);
-console.log(process.env.CLOUD_NAME);
-
-
 // Cấu hình Cloudinary (Đảm bảo bạn đã khai báo biến môi trường trong file .env)
 cloudinary.config({ 
     cloud_name: process.env.CLOUD_NAME, 
