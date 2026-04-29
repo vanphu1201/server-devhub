@@ -156,3 +156,72 @@ export const avatar = async (req: ExtendRequest, res: Response) => {
         return;
     }
 }
+
+// [POST] /api/v1/users/:userId/follow
+export const follow = async (req: ExtendRequest, res: Response) => {
+    try {
+        const myUserId = req.user?.id;
+        const userId = req.params?.userId;
+        // Kiểm tra có vượt qua middleware chưa
+        if (!myUserId) {
+            res.status(401).json({
+                success: false,
+                error: "Bạn chưa đăng nhập!"
+            });
+            return;
+        }
+        // Kieemrr tra client có gửi userId lên param chưa
+        if (!userId) {
+            res.status(400).json({
+                success: false,
+                error: "Chưa chuyền userId lên params!"
+            });
+            return;
+        }
+
+        // Kiêm tra userId truyền lên có hợp lệ không
+        const user = await User.findById(userId);
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                error: "User id gửi lên không hợp lệ!"
+            });
+            return;
+        }
+
+        // Chặn lỗi tự follow bản thân
+        if (myUserId.toString() === userId.toString()) {
+            res.status(400).json({ success: false, error: "Bạn không thể tự theo dõi chính mình!" });
+            return;
+        }
+
+        await Promise.all([
+            User.findByIdAndUpdate(myUserId, { 
+                $addToSet: { following: userId } 
+            }),
+            
+            User.findByIdAndUpdate(userId, { 
+                $addToSet: { followers: myUserId } 
+            })
+        ]);
+
+        // Trả data về cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                "message": "User followed",
+                "isFollowing": true
+            }
+        });
+        return;
+
+
+    } catch (error) {
+        console.log("[Following Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
