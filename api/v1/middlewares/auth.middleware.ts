@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { AuthRequest } from "../../../helpers/extendRequest";
+import { ExtendRequest } from "../../../helpers/extendRequest";
 
 const JWT_SECRET = process.env.JWT_SECRET as string || "super_secret_for_devhub_120107";
 
-export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const requireAuth = (req: ExtendRequest, res: Response, next: NextFunction) => {
     try {
         const authHeader = req.header("Authorization");
 

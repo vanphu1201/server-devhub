@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import User from "../modules/users.module";
 import Post from "../modules/posts.module";
 import mongoose from "mongoose";
-import { AuthRequest } from "../middlewares/auth.middleware";
+import { ExtendRequest } from "../../../helpers/extendRequest";
 
 // [GET] /api/v1/users/:identifier
 export const identifier = async (req: Request, res: Response) => {
@@ -68,7 +68,7 @@ export const identifier = async (req: Request, res: Response) => {
 
 
 // [PUT] /api/v1/users/profile
-export const profile = async (req: AuthRequest, res: Response) => {
+export const profile = async (req: ExtendRequest, res: Response) => {
     try {
         // Kiểm tra có vượt qua requireAuth middleware chưa
         const userId = req.user?.id;
@@ -114,6 +114,44 @@ export const profile = async (req: AuthRequest, res: Response) => {
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+// [POST] /api/v1/users/avatar
+export const avatar = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const avatarUrl: string = req.body.avatar as string;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+        // Lưu link vào Database
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { avatar: avatarUrl },
+            { new: true }
+        ).select("-password -__v");
+
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "Cập nhật ảnh đại diện thành công!",
+                url: avatarUrl,
+                user: updatedUser
+            }
+        });
+
+    } catch (error) {
+        console.error("[Upload Avatar Error:]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi tải ảnh lên!"
         });
         return;
     }

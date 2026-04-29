@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import nodemailer from "nodemailer";
-import { AuthRequest } from "../middlewares/auth.middleware";
+import { ExtendRequest } from "../../../helpers/extendRequest";
 
 const JWT_SECRET = process.env.JWT_SECRET as string || "super_secret_for_devhub_120107";
 const JWT_EXPIRE = process.env.JWT_EXPIRE as any || "7d";
@@ -327,7 +327,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 }
 
 // [POST] /api/v1/auth/update-password
-export const updatePassword = async (req: AuthRequest, res: Response) => {
+export const updatePassword = async (req: ExtendRequest, res: Response) => {
     try {
 
         // kiểm tra xem có xác thực thành công chưa (có chạy qua auth.middleware chưa)
