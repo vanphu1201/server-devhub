@@ -345,3 +345,63 @@ export const unFollow = async (req: ExtendRequest, res: Response) => {
     }
 }
 
+// [GET] /api/v1/users/:userId/is-following
+export const isFollowing = async (req: ExtendRequest, res: Response) => {
+    try {
+        const myUserId = req.user?.id;
+        const userId = req.params?.userId;
+
+        // Kiểm tra đăng nhập
+        if (!myUserId) {
+            res.status(401).json({ 
+            success: false,
+            error: "Vui lòng đăng nhập!"
+        });
+            return;
+        }
+
+        // Kiểm tra tham số truyền lên
+        if (!userId) {
+            res.status(400).json({
+                success: false,
+                error: "Chưa truyền tham số userId lên URL!"
+            });
+            return;
+        }
+
+        // Chặn lỗi CastError 
+        if (!mongoose.isValidObjectId(userId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID người dùng không hợp lệ!"
+            });
+            return;
+        }
+
+        // Xử lý trường hợp tự check chính mình (Vô lý -> Trả về false luôn cho nhanh)
+        if (myUserId.toString() === userId.toString()) {
+            res.status(200).json({
+                isFollowing: false
+            });
+            return;
+        }
+
+        // Tìm xem có User nào là "MÌNH" VÀ có chứa "ID NGƯỜI KIA" trong mảng following không
+        const checkFollow = await User.exists({
+            _id: myUserId,
+            following: userId
+        });
+
+        // Trả kết quả (Ép kiểu checkFollow về dạng Boolean true/false)
+        res.status(200).json({
+            isFollowing: !!checkFollow
+        });
+
+    } catch (error) {
+        console.error("[Check Following Error:]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+    }
+}
