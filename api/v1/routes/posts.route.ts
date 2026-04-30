@@ -7,7 +7,6 @@ const route: Router = Router();
 
 route.post('/:postId/bookmark', requireAuth, controller.bookmark);
 route.delete('/:postId/bookmark', requireAuth, controller.unBookmark);
-
-
+route.get('/:postId/is-bookmarked', requireAuth, controller.isBookmarked);
 
 export const postsRoute: Router = route;

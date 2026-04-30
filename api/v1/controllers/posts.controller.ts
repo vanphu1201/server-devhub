@@ -168,3 +168,56 @@ export const unBookmark = async (req: ExtendRequest, res: Response) => {
     }
 
 }
+
+// [GET] /posts/:postId/is-bookmarked
+export const isBookmarked = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const postId = req.params?.postId;
+
+        // Kiểm tra có đăng nhập chưa
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập"
+            });
+            return;
+        }
+
+        // Kiểm tra có truyền postId lên params không
+        if (!postId) {
+            res.status(400).json({
+                success: false,
+                error: "Chưa truyền postId lên params!"
+            });
+            return;
+        }
+
+        // Kiểm tra postId có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(404).json({
+                success: false,
+                error: "postId gửi lên không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra xem có bookmarked chưa
+        const checkBookmark = await Post.exists({
+            _id: postId,
+            bookmarks: userId
+        });
+        res.status(200).json({
+            success: true,
+            data: {isBookmarked: !!checkBookmark}
+        });
+
+    } catch (error) {
+        console.log("[IsBookmarked Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
