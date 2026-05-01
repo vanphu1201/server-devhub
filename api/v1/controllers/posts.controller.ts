@@ -348,8 +348,8 @@ export const postComments = async (req: ExtendRequest, res: Response) => {
         }
 
         // Kiểm tra bài viết có tồn tại
-        const post = await Post.exists({_id: postId});
-        if (!post) {
+        const isPost = await Post.exists({ _id: postId });
+        if (!isPost) {
             res.status(404).json({
                 success: false,
                 error: "Bài viết không tồn tại!"
@@ -357,7 +357,7 @@ export const postComments = async (req: ExtendRequest, res: Response) => {
             return;
         }
 
-        const safeImages = Array.isArray(images) ? images : []; 
+        const safeImages = Array.isArray(images) ? images : [];
         // Phải có ít nhất nội dung chữ HOẶC có ít nhất 1 ảnh
         if (!content && safeImages.length === 0) {
             res.status(400).json({
@@ -382,6 +382,12 @@ export const postComments = async (req: ExtendRequest, res: Response) => {
             User.findById(userId).select("-password").lean()
         ]);
 
+        // Uơdate cho comment và commentCount cho posts
+        const post = await Post.findByIdAndUpdate(postId, {
+            $addToSet: {comments: newComment._id},
+            $inc: {commentsCount: 1}
+        });
+
         // Trả data cho client
         res.status(200).json({
             success: true,
@@ -396,6 +402,109 @@ export const postComments = async (req: ExtendRequest, res: Response) => {
 
     } catch (error) {
         console.log("[Post comment Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+// [POST] /posts/:postId/comments/:commentId/like
+export const likeCommentPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const postId = req.params?.postId;
+        const commentId = req.params?.commentId;
+
+        // Kiểm tra đăng nhập
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+
+        // Kiểm tra có truyền postId lên params không
+        if (!postId) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng gửi kèm postId lên params!"
+            });
+            return;
+        }
+
+        // Kiểm tra postId có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "postId gửi lên params không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra bài viết có tồn tại
+        const isPost = await Post.exists({ _id: postId });
+        if (!isPost) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        // Kiểm tra có truyền commentId lên params không
+        if (!commentId) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng gửi kèm commentId lên params!"
+            });
+            return;
+        }
+
+        // Kiểm tra commentId có hợp lệ không
+        if (!mongoose.isValidObjectId(commentId)) {
+            res.status(400).json({
+                success: false,
+                error: "CommentId gửi lên params không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra xem comment có thuộc post không, nếu có thì update luôn
+        const comment = await Comment.findOneAndUpdate({
+            _id: commentId,       
+            targetId: postId, 
+            targetType: "post"
+        },
+        {
+            $addToSet: { likes: userId }
+        }, {
+            new: true
+        })
+        .lean();
+        if (!comment) {
+            res.status(400).json({
+                success: false,
+                error: "Comment không có trong post này!"
+            });
+            return;
+        }
+
+        // Trả data cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                liked: true,
+                likesCount: comment.likes.length
+            }
+        });
+        return;
+
+
+    } catch (error) {
+        console.log("[Like Post Comment Error: ]", error);
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống, vui lòng thử lại sau!"
