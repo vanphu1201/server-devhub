@@ -250,7 +250,7 @@ export const getComments = async (req: Request, res: Response) => {
         }
 
         // Kiểm tra postId có tồn tại không
-        const post = await Post.exists({_id: postId});
+        const post = await Post.exists({ _id: postId });
         if (!post) {
             res.status(404).json({
                 success: false,
@@ -305,6 +305,97 @@ export const getComments = async (req: Request, res: Response) => {
 
     } catch (error) {
         console.log("[Get comments Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+// [POST] /posts/:postId/comments
+export const postComments = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const postId = req.params?.postId;
+        const { content, images } = req.body;
+
+        // Kiểm tra đăng nhập
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+
+        // Kiểm tra có truyền postId lên params không
+        if (!postId) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng gửi kèm postId lên params!"
+            });
+            return;
+        }
+
+        // Kiểm tra postId có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "postId gửi lên params không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra bài viết có tồn tại
+        const post = await Post.exists({_id: postId});
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        const safeImages = Array.isArray(images) ? images : []; 
+        // Phải có ít nhất nội dung chữ HOẶC có ít nhất 1 ảnh
+        if (!content && safeImages.length === 0) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng nhập nội dung hoặc đính kèm hình ảnh bình luận!"
+            });
+            return;
+        }
+
+        // Tạo comment mới
+        const newComment = new Comment({
+            author: userId,
+            targetType: "post",
+            targetId: postId,
+            content: content,
+            images: safeImages,
+            likes: []
+        });
+
+        const [savedComment, user] = await Promise.all([
+            newComment.save(),
+            User.findById(userId).select("-password").lean()
+        ]);
+
+        // Trả data cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                id: savedComment._id,
+                content: savedComment.content,
+                author: user,
+                createdAt: savedComment.createdAt
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("[Post comment Error: ]", error);
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống, vui lòng thử lại sau!"
