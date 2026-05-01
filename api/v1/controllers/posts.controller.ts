@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { ExtendRequest } from "../../../helpers/extendRequest";
 import Post from "../modules/posts.module";
 import mongoose from "mongoose";
+import Comment from "../modules/comments.module";
+import User from "../modules/users.module";
 
 // [POST] /posts/:postId/bookmark
 export const bookmark = async (req: ExtendRequest, res: Response) => {
@@ -209,11 +211,100 @@ export const isBookmarked = async (req: ExtendRequest, res: Response) => {
         });
         res.status(200).json({
             success: true,
-            data: {isBookmarked: !!checkBookmark}
+            data: { isBookmarked: !!checkBookmark }
         });
 
     } catch (error) {
         console.log("[IsBookmarked Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+// [GET] /posts/:postId/comments
+export const getComments = async (req: Request, res: Response) => {
+    try {
+        const limit: number = parseInt(req.query?.limit as string) || 20;
+        const offset: number = parseInt(req.query?.offset as string) || 0;
+
+        // Kiểm tra xem có truyền lên postId không
+        const postId = req.params.postId;
+        if (!postId) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng truyền postId lên params!"
+            });
+            return;
+        }
+
+        // Kiểm tra postId có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "postId không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra postId có tồn tại không
+        const post = await Post.exists({_id: postId});
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Post không tồn tại!"
+            });
+            return;
+        }
+
+        // Lấy comments và tổng comment
+        const [totalComments, comments] = await Promise.all([
+            Comment.countDocuments({ targetId: postId, targetType: "post" }),
+
+            // 2. Lấy danh sách comment theo Phân trang
+            Comment.find({ targetId: postId, targetType: "post" })
+                .sort({ createdAt: -1 })
+                .skip(offset)
+                .limit(limit)
+                .select("_id content author likes createdAt")
+                .populate({
+                    path: "author",
+                    select: "-password"
+                })
+                .lean()
+        ]);
+
+        // Nếu không có comment nào, trả về rỗng
+        if (totalComments === 0) {
+            res.status(200).json({
+                success: true,
+                data: { comments: [], total: 0 }
+            });
+            return;
+        }
+
+        const dataCommentValidated = comments.map((comment, _) => ({
+            id: comment._id,
+            content: comment.content,
+            author: comment.author,
+            likes: comment.likes?.length || 0,
+            createdAt: comment.createdAt
+        }))
+
+        // Trả data về cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                comments: dataCommentValidated,
+                total: totalComments
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("[Get comments Error: ]", error);
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống, vui lòng thử lại sau!"

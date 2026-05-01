@@ -8,5 +8,6 @@ const route: Router = Router();
 route.post('/:postId/bookmark', requireAuth, controller.bookmark);
 route.delete('/:postId/bookmark', requireAuth, controller.unBookmark);
 route.get('/:postId/is-bookmarked', requireAuth, controller.isBookmarked);
+route.get('/:postId/comments', controller.getComments);
 
 export const postsRoute: Router = route;
