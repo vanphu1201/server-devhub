@@ -384,8 +384,8 @@ export const postComments = async (req: ExtendRequest, res: Response) => {
 
         // Uơdate cho comment và commentCount cho posts
         const post = await Post.findByIdAndUpdate(postId, {
-            $addToSet: {comments: newComment._id},
-            $inc: {commentsCount: 1}
+            $addToSet: { comments: newComment._id },
+            $inc: { commentsCount: 1 }
         });
 
         // Trả data cho client
@@ -475,11 +475,11 @@ export const deleteComments = async (req: ExtendRequest, res: Response) => {
 
         // Kiểm tra xem comment có thuộc post không, nếu có thì xóa luôn
         const comment = await Comment.findOneAndDelete({
-            _id: commentId,       
-            targetId: postId, 
+            _id: commentId,
+            targetId: postId,
             targetType: "post",
             author: userId
-        }, { new: true}).lean();
+        }, { new: true }).lean();
         if (!comment) {
             res.status(400).json({
                 success: false,
@@ -490,14 +490,14 @@ export const deleteComments = async (req: ExtendRequest, res: Response) => {
 
         // Update cho comment và commentCount cho posts
         const post = await Post.findByIdAndUpdate(postId, {
-            $pull: {comments: commentId},
-            $inc: {commentsCount: -1}
+            $pull: { comments: commentId },
+            $inc: { commentsCount: -1 }
         });
 
         // Trả data cho client
         res.status(200).json({
             success: true,
-            data: {"message": "Comment deleted"}
+            data: { "message": "Comment deleted" }
         });
         return;
 
@@ -575,16 +575,16 @@ export const likeCommentPost = async (req: ExtendRequest, res: Response) => {
 
         // Kiểm tra xem comment có thuộc post không, nếu có thì update luôn
         const comment = await Comment.findOneAndUpdate({
-            _id: commentId,       
-            targetId: postId, 
+            _id: commentId,
+            targetId: postId,
             targetType: "post"
         },
-        {
-            $addToSet: { likes: userId }
-        }, {
+            {
+                $addToSet: { likes: userId }
+            }, {
             new: true
         })
-        .lean();
+            .lean();
         if (!comment) {
             res.status(400).json({
                 success: false,
@@ -606,6 +606,106 @@ export const likeCommentPost = async (req: ExtendRequest, res: Response) => {
 
     } catch (error) {
         console.log("[Like Post Comment Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+// [DELETE] /posts/:postId/comments/:commentId/like
+export const DeleteLikeCommentPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const postId = req.params?.postId;
+        const commentId = req.params?.commentId;
+
+        // Kiểm tra đăng nhập
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+
+        // Kiểm tra có truyền postId lên params không
+        if (!postId) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng gửi kèm postId lên params!"
+            });
+            return;
+        }
+
+        // Kiểm tra postId có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "postId gửi lên params không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra bài viết có tồn tại
+        const isPost = await Post.exists({ _id: postId });
+        if (!isPost) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        // Kiểm tra có truyền commentId lên params không
+        if (!commentId) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng gửi kèm commentId lên params!"
+            });
+            return;
+        }
+
+        // Kiểm tra commentId có hợp lệ không
+        if (!mongoose.isValidObjectId(commentId)) {
+            res.status(400).json({
+                success: false,
+                error: "CommentId gửi lên params không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra xem comment có thuộc post không và người dùng đã tym chưa
+        const comment = await Comment.findOneAndUpdate({
+            _id: commentId,
+            targetId: postId,
+            targetType: "post",
+            likes: userId
+        }, {
+            $pull: { likes: userId }
+        }, {
+            new: true
+        }).lean();
+        if (!comment) {
+            res.status(400).json({
+                success: false,
+                error: "Comment không có trong post này hoặc người dùng chưa like comment trong post này!"
+            });
+            return;
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                liked: false,
+                likesCount: comment.likes.length
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("[Delete Like Post Comment Error: ]", error);
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống, vui lòng thử lại sau!"

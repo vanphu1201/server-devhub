@@ -14,7 +14,6 @@ route.get('/:postId/comments', controller.getComments);
 route.post('/:postId/comments', requireAuth, controller.postComments);
 route.delete('/:postId/comments/:commentId', requireAuth, controller.deleteComments);
 route.post('/:postId/comments/:commentId/like', requireAuth, controller.likeCommentPost);
-
-
+route.delete('/:postId/comments/:commentId/like', requireAuth, controller.DeleteLikeCommentPost);
 
 export const postsRoute: Router = route;
