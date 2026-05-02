@@ -713,3 +713,72 @@ export const DeleteLikeCommentPost = async (req: ExtendRequest, res: Response) =
         return;
     }
 }
+
+// [GET] /posts/:postId/comments/:commentId/is-liked
+export const isLiked = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const postId = req.params?.postId;
+        const commentId = req.params?.commentId;
+
+        // Kiểm tra đăng nhập
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+
+        // kiểm tra Params
+        if (!postId || !commentId) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng gửi kèm postId và commentId!"
+            });
+            return;
+        }
+
+        // kiểm tra định dạng ID hợp lệ
+        if (!mongoose.isValidObjectId(postId) || !mongoose.isValidObjectId(commentId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID gửi lên params không hợp lệ!"
+            });
+            return;
+        }
+
+
+        const comment = await Comment.findOne({
+            _id: commentId,
+            targetId: postId,
+            targetType: "post"
+        }).select("likes").lean();
+
+        // Nếu không tìm thấy -> Bao hàm luôn cả lỗi không có Post và không có Comment
+        if (!comment) {
+            res.status(404).json({
+                success: false,
+                error: "Comment không tồn tại hoặc không thuộc bài viết này!"
+            });
+            return;
+        }
+
+        // Kiểm tra xem userId có nằm trong mảng likes không
+        const isUserLiked = comment.likes.some(id => id.toString() === userId.toString());
+
+        // Trả data cho client
+        res.status(200).json({
+            success: true,
+            data: { isLiked: !!isUserLiked}
+        })
+
+    } catch (error) {
+        console.log("[Like Post Comment Error: ]", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
