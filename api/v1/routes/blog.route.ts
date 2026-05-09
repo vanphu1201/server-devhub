@@ -10,5 +10,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 route.get('/posts', optionalAuth, controller.getPosts);
 route.get('/posts/:idOrSlug', controller.getPost);
 route.get('/admin/posts', requireAuth, requireAdmin, controller.getAllPosts);
+route.post('/posts', requireAuth, controller.postBlogPost);
+
 
 export const blogRoute: Router = route;

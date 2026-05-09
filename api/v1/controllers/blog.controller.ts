@@ -248,3 +248,64 @@ export const getAllPosts = async (req: ExtendRequest, res: Response) => {
         });
     }
 }
+
+// [POST] /api/v1/blog/posts
+export const postBlogPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+
+        // Kiểm tra đăng nhập kép (Bảo vệ thêm 1 lớp dù đã có middleware)
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập để tạo bài viết!"
+            });
+            return;
+        }
+
+        // Trích xuất dữ liệu từ Request Body
+        const { title, content, excerpt, category, tags, images } = req.body;
+
+        // Validate (Kiểm tra) dữ liệu bắt buộc
+        if (!title || !content) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng nhập đầy đủ tiêu đề và nội dung bài viết!"
+            });
+            return;
+        }
+
+        // Khởi tạo bản ghi mới
+        const newPost = new BlogPost({
+            title: title.trim(),
+            content: content,
+            excerpt: excerpt || "",
+            category: category || "",
+            tags: Array.isArray(tags) ? tags : [],
+            images: images || "",
+            author: userId
+        });
+
+        // Lưu xuống Database
+        await newPost.save();
+
+        // Trả về kết quả cho Client
+        res.status(201).json({
+            success: true,
+            data: {
+                id: newPost._id,
+                title: newPost.title,
+                slug: newPost.slug,
+                status: newPost.status,
+                createdAt: newPost.createdAt
+            }
+        });
+
+    } catch (error) {
+        console.error("[Create Blog Post Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi tạo bài viết mới!"
+        });
+    }
+}
