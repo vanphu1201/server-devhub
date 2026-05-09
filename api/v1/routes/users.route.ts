@@ -1,6 +1,6 @@
 import { Router } from "express";
 import * as controller from "../controllers/user.controller";
-import { requireAuth } from "../middlewares/auth.middleware";
+import { optionalAuth, requireAuth } from "../middlewares/auth.middleware";
 import multer from "multer";
 import { uploadCloud } from "../middlewares/uploadCloudinary";
 
@@ -27,7 +27,7 @@ route.post(
 route.post('/:userId/follow', requireAuth, controller.follow);
 route.delete('/:userId/follow', requireAuth, controller.unFollow);
 route.get('/:userId/is-following', requireAuth, controller.isFollowing);
-
+route.get('/:userId/blog/posts', optionalAuth, controller.getBlogPostsUser);
 
 
 export const usersRoute: Router = route;

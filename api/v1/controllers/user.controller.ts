@@ -3,6 +3,7 @@ import User from "../modules/users.module";
 import Post from "../modules/posts.module";
 import mongoose from "mongoose";
 import { ExtendRequest } from "../../../helpers/extendRequest";
+import BlogPost from "../modules/blog_posts.module";
 
 // [GET] /api/v1/users/:identifier
 export const identifier = async (req: Request, res: Response) => {
@@ -353,10 +354,10 @@ export const isFollowing = async (req: ExtendRequest, res: Response) => {
 
         // Kiểm tra đăng nhập
         if (!myUserId) {
-            res.status(401).json({ 
-            success: false,
-            error: "Vui lòng đăng nhập!"
-        });
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
             return;
         }
 
@@ -402,6 +403,89 @@ export const isFollowing = async (req: ExtendRequest, res: Response) => {
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+    }
+}
+
+// [GET] /api/v1/users/:userId/blog/posts?limit=20&offset=0?status=draft
+export const getBlogPostsUser = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { userId } = req.params;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const offset = parseInt(req.query.offset as string) || 0;
+        const status = req.query.status as string;
+
+        // Kiểm tra ID người dùng hợp lệ
+        if (!mongoose.isValidObjectId(userId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID người dùng không hợp lệ!"
+            });
+            return;
+        }
+
+        // Tạo bộ lọc
+        const query: any = { author: userId };
+        const requesterId = req.user?._id; // ID của người đang đăng nhập gọi API
+
+        // Kiểm tra xem: Người đang xem có phải là CHỦ SỞ HỮU của trang profile này không?
+        const isOwner = requesterId && requesterId.toString() === userId.toString();
+
+        if (isOwner) {
+            // Nếu là Chủ nhà: Cho phép họ lọc theo status
+            if (status && ["draft", "pending", "approved", "rejected"].includes(status)) {
+                query.status = status;
+            }
+            // Nếu họ không truyền status gì -> ưu tiên hiển thị bài đã duyệt
+            else {
+                query.status = "approved";
+            }
+        } else {
+            // Nếu là Người lạ: Bắt buộc chỉ được xem bài đã duyệt (Mặc kệ họ có truyền status gì lên)
+            query.status = "approved";
+        }
+
+        // Truy vấn dữ liệu
+        const [posts, total] = await Promise.all([
+            BlogPost.find(query)
+                .sort({ createdAt: -1 })
+                .skip(offset)
+                .limit(limit)
+                .populate("author", "-pasword")
+                .lean(),
+            BlogPost.countDocuments(query)
+        ]);
+
+        // Format dữ liệu
+        const formattedPosts = posts.map(post => ({
+            id: post._id,
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt,
+            image: post.images,
+            category: post.category,
+            tags: post.tags,
+            status: post.status,
+            readTime: post.readTime,
+            views: post.views,
+            likesCount: Array.isArray(post.likes) ? post.likes.length : 0,
+            createdAt: post.createdAt
+        }));
+
+        // Trả kết quả
+        res.status(200).json({
+            success: true,
+            data: {
+                posts: formattedPosts,
+                total: total
+            }
+        });
+
+    } catch (error) {
+        console.error("[Get User Posts Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy danh sách bài viết của người dùng!"
         });
     }
 }
