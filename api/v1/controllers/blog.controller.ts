@@ -160,17 +160,20 @@ export const getPost = async (req: ExtendRequest, res: Response) => {
 
         // Format lại chuẩn JSON trả về như frontend yêu cầu
         res.status(200).json({
-            id: post._id,
-            title: post.title,
-            slug: post.slug,
-            content: post.content,
-            author: post.author,
-            category: post.category,
-            tags: post.tags,
-            image: post.images,
-            readTime: post.readTime,
-            views: post.views,
-            likes: Array.isArray(post.likes) ? post.likes.length : 0,
+            success: true,
+            data: {
+                id: post._id,
+                title: post.title,
+                slug: post.slug,
+                content: post.content,
+                author: post.author,
+                category: post.category,
+                tags: post.tags,
+                image: post.images,
+                readTime: post.readTime,
+                views: post.views,
+                likes: Array.isArray(post.likes) ? post.likes.length : 0,
+            }
         });
 
     } catch (error) {
@@ -178,6 +181,70 @@ export const getPost = async (req: ExtendRequest, res: Response) => {
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống khi lấy chi tiết bài viết!"
+        });
+    }
+}
+
+// [GET] /api/v1/blog/admin/posts?status=draft&limit=20&offset=0
+// (status: draft, pending, approved, rejected)
+export const getAllPosts = async (req: ExtendRequest, res: Response) => {
+    try {
+        // Lấy Params từ Query String
+        const status = req.query.status as string;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const offset = parseInt(req.query.offset as string) || 0;
+
+        // Khởi tạo bộ lọc (Query)
+        const query: any = {};
+
+        // Nếu admin có truyền status
+        if (status) {
+            // Kiểm tra xem status truyền lên có hợp lệ không
+            const validStatuses = ["draft", "pending", "approved", "rejected"];
+            if (validStatuses.includes(status)) {
+                query.status = status;
+            }
+        }
+
+        // Truy vấn song song (Vừa lấy data, vừa đếm tổng số lượng)
+        const [posts, total] = await Promise.all([
+            BlogPost.find(query)
+                .sort({ createdAt: -1 })
+                .skip(offset)
+                .limit(limit)
+                .populate("author", "-password")
+                .lean(),
+            BlogPost.countDocuments(query)
+        ]);
+
+        // Format lại data (Admin thường cần xem các thông số thô nên không cần ẩn nhiều)
+        const formattedPosts = posts.map(post => ({
+            id: post._id,
+            title: post.title,
+            slug: post.slug,
+            author: post.author,
+            category: post.category,
+            status: post.status,
+            views: post.views,
+            likesCount: Array.isArray(post.likes) ? post.likes.length : 0,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt
+        }));
+
+        // Trả kết quả
+        res.status(200).json({
+            success: true,
+            data: {
+                posts: formattedPosts,
+                total: total
+            }
+        });
+
+    } catch (error) {
+        console.error("[Get Admin Posts Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy danh sách bài viết kiểm duyệt!"
         });
     }
 }

@@ -81,3 +81,17 @@ export const optionalAuth = (req: ExtendRequest, res: Response, next: NextFuncti
         next();
     }
 }
+
+
+export const requireAdmin = (req: ExtendRequest, res: Response, next: NextFunction): void => {    
+    const userRole = req.user?.role;
+    if (userRole !== "admin") {
+        res.status(403).json({
+            success: false,
+            error: "Truy cập bị từ chối! Bạn không có quyền Admin."
+        });
+        return;
+    }
+
+    next();
+}
