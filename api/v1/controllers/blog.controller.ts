@@ -309,3 +309,77 @@ export const postBlogPost = async (req: ExtendRequest, res: Response) => {
         });
     }
 }
+
+// [PUT] /api/v1/blog/posts/:postId
+export const putBlogPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { postId } = req.params;
+        const userId = req.user?.id;
+
+        // Kiểm tra ID bài viết có chuẩn không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        // Tìm bài viết trong Database
+        const post = await BlogPost.findById(postId);
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Không tìm thấy bài viết!"
+            });
+            return;
+        }
+
+        // BẢO MẬT: Kiểm tra quyền tác giả (Chỉ tác giả mới được sửa)
+        if (post.author.toString() !== userId.toString()) {
+            res.status(403).json({
+                success: false,
+                error: "Bạn không có quyền chỉnh sửa bài viết này!"
+            });
+            return;
+        }
+
+        const { title, content, excerpt, category, tags, images } = req.body;
+
+        if (title) post.title = title.trim();
+        if (content) post.content = content;
+        if (excerpt !== undefined) post.excerpt = excerpt;
+        if (category !== undefined) post.category = category;
+        if (tags && Array.isArray(tags)) post.tags = tags;
+        if (images !== undefined) post.images = images;
+
+        // Lưu lại xuống Database
+        await post.save();
+
+        // Trả về kết quả thành công
+        res.status(200).json({
+            success: true,
+            message: "Cập nhật bài viết thành công!",
+            data: {
+                post: {
+                    id: post._id,
+                    title: post.title,
+                    slug: post.slug,
+                    content: post.content,
+                    category: post.category,
+                    tags: post.tags,
+                    images: post.images,
+                    status: post.status,
+                    updatedAt: post.updatedAt
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("[Update Blog Post Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi cập nhật bài viết!"
+        });
+    }
+}
