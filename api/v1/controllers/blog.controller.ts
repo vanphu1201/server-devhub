@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ExtendRequest } from "../../../helpers/extendRequest";
 import BlogPost from "../modules/blog_posts.module";
+import mongoose from "mongoose";
 
 // [GET] /api/v1/blog/posts?category=tech&sortBy=latest&limit=20&offset=0&search=keyword
 export const getPosts = async (req: ExtendRequest, res: Response) => {
@@ -99,5 +100,84 @@ export const getPosts = async (req: ExtendRequest, res: Response) => {
             error: "Lỗi hệ thống khi lấy danh sách bài viết!"
         });
         return;
+    }
+}
+
+// [GET] /api/v1/blog/posts/:idOrSlug
+export const getPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { idOrSlug } = req.params;
+
+        // Kiểm tra tham số đầu vào
+        if (!idOrSlug) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng truyền ID hoặc Slug của bài viết!"
+            });
+            return;
+        }
+
+        // Phân loại truy vấn: ID hay Slug?
+        let query: any = {};
+        if (mongoose.isValidObjectId(idOrSlug)) {
+            // Nếu là ID hợp lệ -> Tìm xem khớp _id HOẶC khớp slug
+            query = { $or: [{ _id: idOrSlug }, { slug: idOrSlug }] };
+        } else {
+            // Nếu không phải chuẩn ID -> Chắc chắn là slug
+            query = { slug: idOrSlug };
+        }
+
+        // Vừa tìm bài viết, vừa tăng lượt xem lên 1
+        const post = await BlogPost.findOneAndUpdate(
+            query,
+            { $inc: { views: 1 } },
+            { new: true }
+        )
+            .populate("author", "-password")
+            .lean();
+
+        // Báo lỗi nếu không tìm thấy
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        // BẢO MẬT: Kiểm tra trạng thái bài viết
+        // Nếu bài viết không ở trạng thái "approved" (ví dụ: bản nháp), chỉ tác giả mới được xem
+        if (post.status !== "approved") {
+            const userId = req.user?.id;
+            if (!userId || post.author?._id?.toString() !== userId.toString()) {
+                res.status(403).json({
+                    success: false,
+                    error: "Bài viết này chưa được công khai hoặc đang là bản nháp!"
+                });
+                return;
+            }
+        }
+
+        // Format lại chuẩn JSON trả về như frontend yêu cầu
+        res.status(200).json({
+            id: post._id,
+            title: post.title,
+            slug: post.slug,
+            content: post.content,
+            author: post.author,
+            category: post.category,
+            tags: post.tags,
+            image: post.images,
+            readTime: post.readTime,
+            views: post.views,
+            likes: Array.isArray(post.likes) ? post.likes.length : 0,
+        });
+
+    } catch (error) {
+        console.error("[Get Single Blog Post Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy chi tiết bài viết!"
+        });
     }
 }

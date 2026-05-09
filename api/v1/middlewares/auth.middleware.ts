@@ -49,3 +49,35 @@ export const requireAuth = (req: ExtendRequest, res: Response, next: NextFunctio
         return;
     }
 }
+
+
+// Middleware Xác thực Tùy chọn (Cho phép cả Guest và User đã đăng nhập)
+export const optionalAuth = (req: ExtendRequest, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.header("Authorization");
+
+        // Nếu KHÔNG CÓ header hoặc KHÔNG ĐÚNG chuẩn Bearer -> Coi như khách vãng lai, cho đi tiếp
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            next();
+            return;
+        }
+
+        const token = authHeader.split(" ")[1];
+
+        // Nếu có chữ Bearer nhưng lại không có token đằng sau -> Coi như khách, cho đi tiếp
+        if (!token) {
+            next();
+            return;
+        }
+
+        // Giải mã token bằng đúng biến JWT_SECRET đã khai báo
+        const decode = jwt.verify(token, JWT_SECRET);
+        req.user = decode; // Gắn data vào req.user
+
+        next();
+
+    } catch (error) {
+        // NẾU TOKEN LỖI HOẶC HẾT HẠN: Lờ đi, không gán req.user, cho đi tiếp như khách!
+        next();
+    }
+}
