@@ -383,3 +383,59 @@ export const putBlogPost = async (req: ExtendRequest, res: Response) => {
         });
     }
 }
+
+// [DELETE] /api/v1/blog/posts/:postId
+export const deleteBlogPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { postId } = req.params;
+        const userId = req.user?.id; // Lấy ID của user đang yêu cầu xóa từ token
+
+        // Kiểm tra ID bài viết có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        // Tìm bài viết trong Database
+        const post = await BlogPost.findById(postId);
+
+        // Nếu không tìm thấy bài viết
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Không tìm thấy bài viết!"
+            });
+            return;
+        }
+
+        // BẢO MẬT: Kiểm tra quyền sở hữu
+        if (post.author.toString() !== userId.toString()) {
+            res.status(403).json({
+                success: false,
+                error: "Bạn không có quyền xóa bài viết này!"
+            });
+            return;
+        }
+
+        await post.deleteOne();
+
+        // Trả về thông báo
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "Blog post deleted"
+            }
+        });
+
+    } catch (error) {
+        console.error("[Delete Blog Post Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi xóa bài viết!"
+        });
+    }
+
+}
