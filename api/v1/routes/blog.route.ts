@@ -14,5 +14,6 @@ route.post('/posts', requireAuth, controller.postBlogPost);
 route.put('/posts/:postId', requireAuth, controller.putBlogPost);
 route.delete('/posts/:postId', requireAuth, controller.deleteBlogPost);
 route.post('/admin/posts/:postId/approve', requireAuth, requireAdmin, controller.adminApproveBlogPost);
+route.get('/posts/:postId/like', requireAuth, controller.getBlogPostLike);
 
 export const blogRoute: Router = route;

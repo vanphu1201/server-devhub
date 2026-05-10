@@ -490,3 +490,51 @@ export const adminApproveBlogPost = async (req: ExtendRequest, res: Response) =>
         });
     }
 }
+
+// [GET] /api/v1/blog/posts/:postId/like
+export const getBlogPostLike = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { postId } = req.params;
+        const userId = req.user?.id;
+
+        // Kiểm tra ID bài viết hợp lệ
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        // TRUY VẤN TỐI ƯU: Thêm ID user vào mảng likes và chỉ select đúng trường likes về
+        const post = await BlogPost.findByIdAndUpdate(
+            postId,
+            { $addToSet: { likes: userId } },
+            { new: true }        
+        )
+            .select("likes") 
+            .lean();
+
+        // Nếu không tìm thấy bài viết
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        // Trả về kết quả
+        res.status(200).json({
+            liked: true,
+            likesCount: Array.isArray(post.likes) ? post.likes.length : 0
+        });
+
+    } catch (error) {
+        console.error("[Like Blog Post Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi thả tim bài viết!"
+        });
+    }
+}
