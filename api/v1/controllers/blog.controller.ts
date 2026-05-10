@@ -510,9 +510,9 @@ export const getBlogPostLike = async (req: ExtendRequest, res: Response) => {
         const post = await BlogPost.findByIdAndUpdate(
             postId,
             { $addToSet: { likes: userId } },
-            { new: true }        
+            { new: true }
         )
-            .select("likes") 
+            .select("likes")
             .lean();
 
         // Nếu không tìm thấy bài viết
@@ -526,8 +526,11 @@ export const getBlogPostLike = async (req: ExtendRequest, res: Response) => {
 
         // Trả về kết quả
         res.status(200).json({
-            liked: true,
-            likesCount: Array.isArray(post.likes) ? post.likes.length : 0
+            success: true,
+            data: {
+                liked: true,
+                likesCount: Array.isArray(post.likes) ? post.likes.length : 0
+            }
         });
 
     } catch (error) {
@@ -535,6 +538,60 @@ export const getBlogPostLike = async (req: ExtendRequest, res: Response) => {
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống khi thả tim bài viết!"
+        });
+    }
+}
+
+// [DELETE] /api/v1/blog/posts/:postId/like
+export const deleteBlogPostLike = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { postId } = req.params;
+        const userId = req.user?.id;
+
+        // Kiểm tra postId có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        // Rút userId khỏi mảng likes và lấy về dữ liệu mới nhất
+        const updatedPost = await BlogPost.findByIdAndUpdate(
+            postId,
+            { $pull: { likes: userId } },
+            { new: true }
+        )
+            .select("likes")
+            .lean();
+
+        // Nếu không tìm thấy bài viết
+        if (!updatedPost) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        // Đảm bảo an toàn cho mảng
+        const likesArray = Array.isArray(updatedPost.likes) ? updatedPost.likes : [];
+
+        // Trả về kết quả cho Client
+        res.status(200).json({
+            success: true,
+            data: {
+                liked: false,
+                likesCount: likesArray.length
+            }
+        });
+
+    } catch (error) {
+        console.error("[Unlike Blog Post Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi bỏ thích bài viết!"
         });
     }
 }
