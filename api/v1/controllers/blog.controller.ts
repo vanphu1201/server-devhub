@@ -439,3 +439,54 @@ export const deleteBlogPost = async (req: ExtendRequest, res: Response) => {
     }
 
 }
+
+// [POST] /api/v1/blog/admin/posts/:postId/approve
+export const adminApproveBlogPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { postId } = req.params;
+        const userId = req.user?.id;
+        const role = req.user?.role;
+
+        // Kiểm tra postId có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra postId có tồn tại không
+        const blogPost = await BlogPost.findByIdAndUpdate(postId, {
+            status: "approved"
+        }, {
+            new: true
+        });
+
+        // Nếu không tồn tại thì trả về lỗi
+        if (!blogPost) {
+            res.status(404).json({
+                success: false,
+                error: "Bài đăng này không tồn tại!"
+            });
+            return;
+        }
+
+        // nếu tồn tại thì update approve và trả data cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "Blog post approved",
+                post: blogPost
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.error("[Admin Approve Blog Post Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+    }
+}
