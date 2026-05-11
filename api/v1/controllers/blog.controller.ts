@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { ExtendRequest } from "../../../helpers/extendRequest";
 import BlogPost from "../modules/blog_posts.module";
 import mongoose from "mongoose";
+import { error } from "node:console";
 
 // [GET] /api/v1/blog/posts?category=tech&sortBy=latest&limit=20&offset=0&search=keyword
 export const getPosts = async (req: ExtendRequest, res: Response) => {
@@ -593,5 +594,229 @@ export const deleteBlogPostLike = async (req: ExtendRequest, res: Response) => {
             success: false,
             error: "Lỗi hệ thống khi bỏ thích bài viết!"
         });
+    }
+}
+
+// [GET] /api/v1/blog/posts/:postId/is-liked
+export const getIsLiked = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { postId } = req.params;
+        const userId = req.user?.id;
+
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({ success: false, error: "Id bài đăng không hợp lệ!" });
+            return;
+        }
+
+        // TỐI ƯU RAM: Thêm .select("likes")
+        const blogPost = await BlogPost.findById(postId).select("likes").lean();
+
+        if (!blogPost) {
+            res.status(404).json({ success: false, error: "Bài đăng không tồn tại!" });
+            return;
+        }
+
+        // FIX LỖI: So sánh chính xác ObjectId với String
+        const likesArray = Array.isArray(blogPost.likes) ? blogPost.likes : [];
+        const isUserLiked = userId ? likesArray.some(id => id.toString() === userId.toString()) : false;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                isLiked: isUserLiked
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("Is Liking Blog Post Error: ", error);
+        res.status(500).json({ success: false, error: "Lỗi hệ thống, vui lòng thử lại sau!" });
+        return;
+    }
+}
+
+// [POST] /api/v1/blog/posts/:postId/bookmark
+export const postBookMark = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { postId } = req.params;
+
+        // Kiểm tra id bài viết có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "Id bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra có tồn tại không, nếu tồn tại thfi update luôn
+        const updatedBlogPost = await BlogPost.findByIdAndUpdate(
+            postId,
+            { $addToSet: { bookmarks: userId } },
+        )
+
+        // Nếu không tồn tại
+        if (!updatedBlogPost) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        // Trả data về cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                bookmarked: true
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("Book Mark Blog Post Error: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+// [DELETE] /api/v1/blog/posts/:postId/bookmark
+export const deleteBookMark = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { postId } = req.params;
+
+        // Kiểm tra id bài viết có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "Id bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra có tồn tại không, nếu tồn tại thì update luôn
+        const updatedBlogPost = await BlogPost.findByIdAndUpdate(
+            postId,
+            { $pull: { bookmarks: userId } },
+        )
+
+        // Nếu không tồn tại
+        if (!updatedBlogPost) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        // Trả data về cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                bookmarked: false
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("Delete Book Mark Blog Post Error: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+// [GET] /api/v1/blog/posts/:postId/is-bookmarked
+export const getBookMark = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { postId } = req.params;
+
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({ success: false, error: "Id bài viết không hợp lệ!" });
+            return;
+        }
+
+        const blogPost = await BlogPost.findById(postId).select("bookmarks").lean();
+
+        if (!blogPost) {
+            res.status(404).json({ success: false, error: "Bài viết không tồn tại!" });
+            return;
+        }
+
+        // FIX LỖI: So sánh chính xác ObjectId với String
+        const bookmarksArray = Array.isArray(blogPost.bookmarks) ? blogPost.bookmarks : [];
+        const isUserBookmarked = userId ? bookmarksArray.some(id => id.toString() === userId.toString()) : false;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                isBookmarked: isUserBookmarked
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("Get Book Mark Blog Post Error: ", error);
+        res.status(500).json({ success: false, error: "Lỗi hệ thống, vui lòng thử lại sau!" });
+        return;
+    }
+}
+
+// [POST] /api/v1/blog/posts/:postId/view
+export const increasingView = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { postId } = req.params;
+
+        // Kiểm tra id bài viết có hợp lệ không
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "Id bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        // Kiểm tra blog post có tồn tại không
+        const updatedBlogPost = await BlogPost.findByIdAndUpdate(
+            postId,
+            { $inc: { views: 1 } },
+            { new: true }
+        )
+            .select("views")
+            .lean();
+
+        // Nếu không tồn tại
+        if (!updatedBlogPost) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        // Trả data về cho client
+        res.status(200).json({
+            success: true,
+            data: {
+                views: updatedBlogPost.views
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("Increasing View Blog Post Error: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
     }
 }

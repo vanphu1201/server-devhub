@@ -16,6 +16,12 @@ route.delete('/posts/:postId', requireAuth, controller.deleteBlogPost);
 route.post('/admin/posts/:postId/approve', requireAuth, requireAdmin, controller.adminApproveBlogPost);
 route.get('/posts/:postId/like', requireAuth, controller.getBlogPostLike);
 route.delete('/posts/:postId/like', requireAuth, controller.deleteBlogPostLike);
+route.get('/posts/:postId/is-liked', requireAuth, controller.getIsLiked);
+route.post('/posts/:postId/bookmark', requireAuth, controller.postBookMark);
+route.delete('/posts/:postId/bookmark', requireAuth, controller.deleteBookMark);
+route.get('/posts/:postId/is-bookmarked', requireAuth, controller.getBookMark);
+route.post('/posts/:postId/view', controller.increasingView);
+
 
 
 export const blogRoute: Router = route;
