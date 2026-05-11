@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
-import User from "../modules/users.module";
-import Post from "../modules/posts.module";
+import User from "../models/users.model";
+import Post from "../models/posts.model";
 import mongoose from "mongoose";
 import { ExtendRequest } from "../../../helpers/extendRequest";
-import BlogPost from "../modules/blog_posts.module";
+import BlogPost from "../models/blog_posts.model";
 
 // [GET] /api/v1/users/:identifier
 export const identifier = async (req: Request, res: Response) => {

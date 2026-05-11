@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import User from "../modules/users.module";
+import User from "../models/users.model";
 
 
 // [GET] /api/v1/leaderboard?limit=50&offset=0
@@ -9,11 +9,11 @@ export const getLeaderboard = async (req: Request, res: Response) => {
         const offset = parseInt(req.query.offset as string) || 0;
 
         // Bảo mật: Chặn client yêu cầu quá nhiều data cùng lúc gây sập server
-        const safeLimit = limit > 100 ? 100 : limit; 
+        const safeLimit = limit > 100 ? 100 : limit;
 
         // Truy vấn Database
-        const topUsers = await User.find({isBanned: { $ne: true } })
-            .sort({ reputation: -1 }) 
+        const topUsers = await User.find({ isBanned: { $ne: true } })
+            .sort({ reputation: -1 })
             .skip(offset)
             .limit(safeLimit)
             .select("_id displayName reputation avatar")
@@ -25,7 +25,7 @@ export const getLeaderboard = async (req: Request, res: Response) => {
             displayName: user.displayName,
             reputation: user.reputation,
             avatar: user.avatar,
-            rank: offset + index + 1 
+            rank: offset + index + 1
         }));
 
         // Trả data về cho client

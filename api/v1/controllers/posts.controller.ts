@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { ExtendRequest } from "../../../helpers/extendRequest";
-import Post from "../modules/posts.module";
+import Post from "../models/posts.model";
 import mongoose from "mongoose";
-import Comment from "../modules/comments.module";
-import User from "../modules/users.module";
+import Comment from "../models/comments.model";
+import User from "../models/users.model";
 
 // [POST] /posts/:postId/bookmark
 export const bookmark = async (req: ExtendRequest, res: Response) => {
@@ -770,7 +770,7 @@ export const isLiked = async (req: ExtendRequest, res: Response) => {
         // Trả data cho client
         res.status(200).json({
             success: true,
-            data: { isLiked: !!isUserLiked}
+            data: { isLiked: !!isUserLiked }
         })
 
     } catch (error) {

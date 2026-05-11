@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { ExtendRequest } from "../../../helpers/extendRequest";
-import BlogPost from "../modules/blog_posts.module";
+import BlogPost from "../models/blog_posts.model";
 import mongoose from "mongoose";
 import { error } from "node:console";
 

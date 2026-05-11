@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import User from "../modules/users.module";
+import User from "../models/users.model";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
@@ -361,14 +361,14 @@ export const updatePassword = async (req: ExtendRequest, res: Response) => {
 
 
         // Lấy user từ database
-        const user = await User.findOne({_id: userId});
+        const user = await User.findOne({ _id: userId });
         if (!user) {
             res.status(404).json({
                 success: false,
                 error: "Không tìm thấy tài khoản người dùng!"
             });
             return;
-        } 
+        }
 
         // so sánh mật khkhaaurux có khớp với database không
         const isComparePassword = await bcrypt.compare(currentPassword, user.password as string);
