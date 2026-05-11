@@ -970,3 +970,66 @@ export const getSeriesWithAllPost = async (req: ExtendRequest, res: Response) =>
         return;
     }
 }
+
+// [GET] /api/v1/blog/admin/series
+export const getAllSeriesAdmin = async (req: ExtendRequest, res: Response) => {
+    try {
+        const limit = parseInt(req.query.limit as string) || 20;
+        const offset = parseInt(req.query.offset as string) || 0;
+        const status = req.query.status as string;
+
+        // Xây dựng bộ lọc
+        // Admin xem được tất cả, nhưng vẫn hỗ trợ lọc theo status nếu Admin muốn
+        const query: any = {};
+        if (status) {
+            query.status = status;
+        }
+
+        // Truy vấn song song
+        const [seriesList, total] = await Promise.all([
+            BlogSeries.find(query)
+                .sort({ createdAt: -1 })
+                .skip(offset)
+                .limit(limit)
+                .populate("author", "-password")
+                .lean(),
+            BlogSeries.countDocuments(query)
+        ]);
+
+        // Format dữ liệu trả về cho Admin
+        const formattedSeries = seriesList.map(series => {
+            const postsArray = Array.isArray(series.posts) ? series.posts : [];
+
+            return {
+                id: series._id,
+                title: series.title,
+                slug: series.slug,
+                description: series.description,
+                image: series.image,
+                author: series.author,
+                postsCount: postsArray.length, 
+                status: series.status || "public",
+                createdAt: series.createdAt,
+                updatedAt: series.updatedAt
+            };
+        });
+
+        // Trả kết quả
+        res.status(200).json({
+            success: true,
+            data: {
+                series: formattedSeries,
+                total: total
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.error("[Get Admin Series Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy danh sách series cho Admin!"
+        });
+        return;
+    }
+}

@@ -26,6 +26,7 @@ route.post('/posts/:postId/view', controller.increasingView);
 // blog/series
 route.get('/series', controller.getSeries);
 route.get('/series/:idOrSlug', controller.getSeriesWithAllPost);
+route.get('/admin/series', requireAuth, requireAdmin, controller.getAllSeriesAdmin);
 
 
 
