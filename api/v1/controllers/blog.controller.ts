@@ -847,7 +847,7 @@ export const getSeries = async (req: ExtendRequest, res: Response) => {
                 .sort({ createdAt: -1 }) // Ưu tiên series mới nhất lên đầu
                 .skip(offset)
                 .limit(limit)
-                .populate("author", "-password") 
+                .populate("author", "-password")
                 .lean(),
             BlogSeries.countDocuments(query)
         ]);
@@ -884,6 +884,88 @@ export const getSeries = async (req: ExtendRequest, res: Response) => {
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+// [GET] /api/v1/blog/series/:idOrSlug
+export const getSeriesWithAllPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { idOrSlug } = req.params;
+
+        if (!idOrSlug) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng truyền ID hoặc Slug của series!"
+            });
+            return;
+        }
+
+        // Phân loại Query: Tìm theo ID hay Slug
+        let query: any = {};
+        if (mongoose.isValidObjectId(idOrSlug)) {
+            query = { $or: [{ _id: idOrSlug }, { slug: idOrSlug }] };
+        } else {
+            query = { slug: idOrSlug };
+        }
+
+        // Vừa tìm, vừa populate thông tin tác giả và danh sách posts
+        const series = await BlogSeries.findOneAndUpdate(
+            query,
+            { new: true }
+        )
+            .populate("author", "-password")
+            .populate({
+                path: "posts",
+                select: "title slug content excerpt status createdAt",
+                match: { status: "approved" } // Chỉ lấy các bài viết đã được duyệt
+            })
+            .lean();
+
+        // Nếu không tìm thấy series
+        if (!series) {
+            res.status(404).json({
+                success: false,
+                error: "Series không tồn tại!"
+            });
+            return;
+        }
+
+        // Chuẩn hóa dữ liệu mảng posts và thêm số thứ tự (order)
+        const rawPosts = Array.isArray(series.posts) ? series.posts : [];
+
+        const formattedPosts = rawPosts.map((post: any, index: number) => ({
+            id: post._id,
+            title: post.title,
+            slug: post.slug,
+            order: index + 1, // Tự động gán thứ tự dựa trên vị trí của mảng (đã ordered trong DB)
+            content: post.content,
+            excerpt: post.excerpt,
+            createdAt: post.createdAt
+        }));
+
+        // Trả kết quả chuẩn JSON
+        res.status(200).json({
+            success: true,
+            data: {
+                id: series._id,
+                title: series.title,
+                slug: series.slug,
+                description: series.description,
+                image: series.image,
+                author: series.author,
+                posts: formattedPosts,
+                createdAt: series.createdAt
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.error("[Get Series Detail Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy chi tiết series!"
         });
         return;
     }
