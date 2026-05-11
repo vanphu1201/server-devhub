@@ -7,6 +7,7 @@ import { uploadCloud } from "../middlewares/uploadCloudinary";
 const route: Router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+// blog/posts
 route.get('/posts', optionalAuth, controller.getPosts);
 route.get('/posts/:idOrSlug', controller.getPost);
 route.get('/admin/posts', requireAuth, requireAdmin, controller.getAllPosts);
@@ -21,6 +22,10 @@ route.post('/posts/:postId/bookmark', requireAuth, controller.postBookMark);
 route.delete('/posts/:postId/bookmark', requireAuth, controller.deleteBookMark);
 route.get('/posts/:postId/is-bookmarked', requireAuth, controller.getBookMark);
 route.post('/posts/:postId/view', controller.increasingView);
+
+// blog/series
+route.get('/series', controller.getSeries);
+
 
 
 

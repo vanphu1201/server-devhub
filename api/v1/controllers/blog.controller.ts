@@ -3,6 +3,7 @@ import { ExtendRequest } from "../../../helpers/extendRequest";
 import BlogPost from "../models/blog_posts.model";
 import mongoose from "mongoose";
 import { error } from "node:console";
+import BlogSeries from "../models/blog_series.model";
 
 // [GET] /api/v1/blog/posts?category=tech&sortBy=latest&limit=20&offset=0&search=keyword
 export const getPosts = async (req: ExtendRequest, res: Response) => {
@@ -813,6 +814,73 @@ export const increasingView = async (req: ExtendRequest, res: Response) => {
 
     } catch (error) {
         console.log("Increasing View Blog Post Error: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống, vui lòng thử lại sau!"
+        });
+        return;
+    }
+}
+
+
+// [GET] /api/v1/blog/series?limit=20&offset=0&search=keyword
+export const getSeries = async (req: ExtendRequest, res: Response) => {
+    try {
+        // Lấy và chuẩn hóa Params từ Query String
+        const search = req.query.search as string;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const offset = parseInt(req.query.offset as string) || 0;
+
+        // Xây dựng bộ lọc tìm kiếm (Query)
+        const query: any = {};
+        if (search) {
+            // Tìm kiếm tương đối (không phân biệt hoa thường) trong Tiêu đề hoặc Mô tả
+            query.$or = [
+                { title: { $regex: search, $options: "i" } },
+                { description: { $regex: search, $options: "i" } }
+            ];
+        }
+
+        // Truy vấn song song: Vừa lấy danh sách, vừa đếm tổng số lượng
+        const [seriesList, total] = await Promise.all([
+            BlogSeries.find(query)
+                .sort({ createdAt: -1 }) // Ưu tiên series mới nhất lên đầu
+                .skip(offset)
+                .limit(limit)
+                .populate("author", "-password") 
+                .lean(),
+            BlogSeries.countDocuments(query)
+        ]);
+
+        // Format dữ liệu
+        const formattedSeries = seriesList.map(series => {
+            // Đảm bảo an toàn cho mảng posts
+            const postsArray = Array.isArray(series.posts) ? series.posts : [];
+
+            return {
+                id: series._id,
+                title: series.title,
+                slug: series.slug,
+                description: series.description,
+                image: series.image,
+                author: series.author,
+                postsCount: postsArray.length,
+                createdAt: series.createdAt
+            };
+        });
+
+        // Trả kết quả thành công cho Client
+        res.status(200).json({
+            success: true,
+            data: {
+                series: formattedSeries,
+                total: total
+            }
+        });
+        return;
+
+    } catch (error) {
+        console.log("Get Blog Series Error: ", error);
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống, vui lòng thử lại sau!"
