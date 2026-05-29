@@ -3,6 +3,7 @@ import * as controller from "../controllers/user.controller";
 import { optionalAuth, requireAuth } from "../middlewares/auth.middleware";
 import multer from "multer";
 import { uploadCloud } from "../middlewares/uploadCloudinary";
+import { getUserProducts, getUserPurchases } from "../controllers/products.controller";
 
 const route: Router = Router();
 // Khởi tạo multer lưu RAM
@@ -30,5 +31,7 @@ route.get('/:userId/is-following', requireAuth, controller.isFollowing);
 route.get('/:userId/blog/posts', optionalAuth, controller.getBlogPostsUser);
 route.get('/:userId/blog/series', optionalAuth, controller.getBlogSeriesUser);
 route.get('/:userId/posts', optionalAuth, controller.getUserPosts);
+route.get('/:userId/products', optionalAuth, getUserProducts);
+route.get('/:userId/purchases', requireAuth, getUserPurchases);
 
 export const usersRoute: Router = route;
