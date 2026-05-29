@@ -4,6 +4,7 @@ import { optionalAuth, requireAuth } from "../middlewares/auth.middleware";
 import multer from "multer";
 import { uploadCloud } from "../middlewares/uploadCloudinary";
 import { getUserProducts, getUserPurchases } from "../controllers/products.controller";
+import { getUserUnlockedResources } from "../controllers/resources.controller";
 
 const route: Router = Router();
 // Khởi tạo multer lưu RAM
@@ -33,5 +34,6 @@ route.get('/:userId/blog/series', optionalAuth, controller.getBlogSeriesUser);
 route.get('/:userId/posts', optionalAuth, controller.getUserPosts);
 route.get('/:userId/products', optionalAuth, getUserProducts);
 route.get('/:userId/purchases', requireAuth, getUserPurchases);
+route.get('/:userId/resources/purchases', requireAuth, getUserUnlockedResources);
 
 export const usersRoute: Router = route;
