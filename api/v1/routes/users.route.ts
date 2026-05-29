@@ -28,6 +28,7 @@ route.post('/:userId/follow', requireAuth, controller.follow);
 route.delete('/:userId/follow', requireAuth, controller.unFollow);
 route.get('/:userId/is-following', requireAuth, controller.isFollowing);
 route.get('/:userId/blog/posts', optionalAuth, controller.getBlogPostsUser);
+route.get('/:userId/blog/series', optionalAuth, controller.getBlogSeriesUser);
 route.get('/:userId/posts', optionalAuth, controller.getUserPosts);
 
 export const usersRoute: Router = route;

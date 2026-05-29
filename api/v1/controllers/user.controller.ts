@@ -4,6 +4,7 @@ import Post from "../models/posts.model";
 import mongoose from "mongoose";
 import { ExtendRequest } from "../../../helpers/extendRequest";
 import BlogPost from "../models/blog_posts.model";
+import BlogSeries from "../models/blog_series.model";
 
 // [GET] /api/v1/users/:identifier
 export const identifier = async (req: Request, res: Response) => {
@@ -553,6 +554,81 @@ export const getUserPosts = async (req: ExtendRequest, res: Response) => {
         res.status(500).json({
             success: false,
             error: "Lỗi hệ thống khi lấy danh sách bài viết mạng xã hội của người dùng!"
+        });
+    }
+};
+
+// [GET] /api/v1/users/:userId/blog/series
+export const getBlogSeriesUser = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { userId } = req.params;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const offset = parseInt(req.query.offset as string) || 0;
+
+        if (!mongoose.isValidObjectId(userId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID người dùng không hợp lệ!"
+            });
+            return;
+        }
+
+        const query: any = { author: userId };
+        const requesterId = req.user?.id;
+        const isOwner = requesterId && requesterId.toString() === userId.toString();
+
+        if (!isOwner) {
+            query.status = "approved";
+        } else {
+            const status = req.query.status as string;
+            if (status && ["draft", "pending", "approved", "rejected"].includes(status)) {
+                query.status = status;
+            } else {
+                query.status = "approved";
+            }
+        }
+
+        const [seriesList, total] = await Promise.all([
+            BlogSeries.find(query)
+                .sort({ createdAt: -1 })
+                .skip(offset)
+                .limit(limit)
+                .populate("author", "-password")
+                .lean(),
+            BlogSeries.countDocuments(query)
+        ]);
+
+        const formattedSeries = await Promise.all(seriesList.map(async (series: any) => {
+            // Đếm số bài viết thuộc series này
+            const posts = await BlogPost.find({ series: series._id, status: "approved" }).select("views").lean();
+            const totalViews = posts.reduce((sum, p) => sum + (p.views || 0), 0);
+
+            return {
+                id: series._id,
+                title: series.title,
+                slug: series.slug,
+                description: series.description,
+                image: series.image,
+                author: series.author,
+                postsCount: posts.length,
+                views: totalViews,
+                createdAt: series.createdAt
+            };
+        }));
+
+        res.status(200).json({
+            success: true,
+            data: {
+                series: formattedSeries,
+                total: total
+            }
+        });
+
+    } catch (error) {
+        console.error("[Get User Blog Series Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy danh sách series bài viết của người dùng!"
         });
     }
 };
