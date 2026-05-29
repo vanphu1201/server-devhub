@@ -6,7 +6,7 @@ export const uploadCloud = async (req: ExtendRequest, res: Response, next: NextF
     try {
         // TRƯỜNG HỢP 1: Tải lên NHIỀU ẢNH (upload.array) -> Dữ liệu nằm ở req.files
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-            const files = req.files as Express.Multer.File[];
+            const files = req.files as any[];
             const fieldName = files[0].fieldname;
             
             const uploadPromises = files.map(file => uploadBufferToCloudinary(file.buffer));
