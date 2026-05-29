@@ -1,0 +1,30 @@
+services:
+  # -------------------------------------------------------------
+  # Backend Express & MongoDB Service on Render
+  # -------------------------------------------------------------
+  - type: web
+    name: devhub-server
+    env: node
+    plan: free # Sử dụng gói miễn phí của Render
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URL
+        sync: false # Nhập URL kết nối MongoDB Atlas của bạn khi deploy
+      - key: JWT_SECRET
+        generateValue: true # Render sẽ tự động sinh mã JWT secret an toàn
+      - key: NODE_ENV
+        value: production
+      # Các biến môi trường tùy chọn khác nếu bạn sử dụng
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
