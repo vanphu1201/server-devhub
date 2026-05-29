@@ -27,8 +27,10 @@ route.post('/posts/:postId/view', controller.increasingView);
 route.get('/series', controller.getSeries);
 route.get('/series/:idOrSlug', controller.getSeriesWithAllPost);
 route.get('/admin/series', requireAuth, requireAdmin, controller.getAllSeriesAdmin);
-
-
+route.post('/series', requireAuth, controller.createSeries);
+route.put('/series/:seriesId', requireAuth, controller.updateSeries);
+route.delete('/series/:seriesId', requireAuth, controller.deleteSeries);
+route.post('/admin/series/:seriesId/approve', requireAuth, requireAdmin, controller.approveSeries);
 
 
 export const blogRoute: Router = route;

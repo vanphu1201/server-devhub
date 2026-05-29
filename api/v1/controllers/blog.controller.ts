@@ -1032,4 +1032,211 @@ export const getAllSeriesAdmin = async (req: ExtendRequest, res: Response) => {
         });
         return;
     }
-}
+};
+
+// [POST] /api/v1/blog/series
+export const createSeries = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập để tạo series!"
+            });
+            return;
+        }
+
+        const { title, description, image } = req.body;
+        if (!title) {
+            res.status(400).json({
+                success: false,
+                error: "Vui lòng cung cấp tiêu đề series!"
+            });
+            return;
+        }
+
+        const newSeries = new BlogSeries({
+            title: title.trim(),
+            description: description || "",
+            image: image || "",
+            author: userId,
+            status: "draft",
+            posts: []
+        });
+
+        await newSeries.save();
+
+        res.status(201).json({
+            success: true,
+            data: {
+                id: newSeries._id,
+                title: newSeries.title,
+                slug: newSeries.slug,
+                createdAt: newSeries.createdAt
+            }
+        });
+    } catch (error) {
+        console.error("[Create Series Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi tạo series mới!"
+        });
+    }
+};
+
+// [PUT] /api/v1/blog/series/:seriesId
+export const updateSeries = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { seriesId } = req.params;
+        const userId = req.user?.id;
+
+        if (!mongoose.isValidObjectId(seriesId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID series không hợp lệ!"
+            });
+            return;
+        }
+
+        const series = await BlogSeries.findById(seriesId);
+        if (!series) {
+            res.status(404).json({
+                success: false,
+                error: "Không tìm thấy series bài viết!"
+            });
+            return;
+        }
+
+        if (series.author.toString() !== userId.toString()) {
+            res.status(403).json({
+                success: false,
+                error: "Bạn không có quyền chỉnh sửa series này!"
+            });
+            return;
+        }
+
+        const { title, description, image, posts } = req.body;
+        if (title) series.title = title.trim();
+        if (description !== undefined) series.description = description;
+        if (image !== undefined) series.image = image;
+        
+        if (posts && Array.isArray(posts)) {
+            series.posts = posts as any;
+        }
+
+        await series.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Series updated",
+            data: {
+                series: {
+                    id: series._id,
+                    title: series.title,
+                    slug: series.slug,
+                    description: series.description,
+                    image: series.image,
+                    posts: series.posts,
+                    updatedAt: series.updatedAt
+                }
+            }
+        });
+    } catch (error) {
+        console.error("[Update Series Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi cập nhật series!"
+        });
+    }
+};
+
+// [DELETE] /api/v1/blog/series/:seriesId
+export const deleteSeries = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { seriesId } = req.params;
+        const userId = req.user?.id;
+
+        if (!mongoose.isValidObjectId(seriesId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID series không hợp lệ!"
+            });
+            return;
+        }
+
+        const series = await BlogSeries.findById(seriesId);
+        if (!series) {
+            res.status(404).json({
+                success: false,
+                error: "Không tìm thấy series bài viết!"
+            });
+            return;
+        }
+
+        if (series.author.toString() !== userId.toString()) {
+            res.status(403).json({
+                success: false,
+                error: "Bạn không có quyền xóa series này!"
+            });
+            return;
+        }
+
+        await BlogPost.updateMany({ series: seriesId }, { $unset: { series: "" } });
+        await series.deleteOne();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "Series deleted"
+            }
+        });
+    } catch (error) {
+        console.error("[Delete Series Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi xóa series!"
+        });
+    }
+};
+
+// [POST] /api/v1/blog/admin/series/:seriesId/approve
+export const approveSeries = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { seriesId } = req.params;
+        const { approved } = req.body;
+
+        if (!mongoose.isValidObjectId(seriesId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID series không hợp lệ!"
+            });
+            return;
+        }
+
+        const series = await BlogSeries.findById(seriesId);
+        if (!series) {
+            res.status(404).json({
+                success: false,
+                error: "Không tìm thấy series bài viết!"
+            });
+            return;
+        }
+
+        series.status = approved ? "approved" : "rejected";
+        await series.save();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                message: approved ? "Series approved" : "Series rejected",
+                series: series
+            }
+        });
+    } catch (error) {
+        console.error("[Approve Series Error]: ", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi phê duyệt series!"
+        });
+    }
+};
