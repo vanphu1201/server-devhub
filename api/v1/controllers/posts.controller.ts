@@ -782,3 +782,480 @@ export const isLiked = async (req: ExtendRequest, res: Response) => {
         return;
     }
 }
+
+// [GET] /posts?filter=trending&limit=20&offset=0&search=keyword
+export const getPosts = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const filter = req.query.filter as string || "latest";
+        const search = req.query.search as string;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const offset = parseInt(req.query.offset as string) || 0;
+
+        const query: any = { visibility: "public" };
+
+        if (search) {
+            query.content = { $regex: search, $options: "i" };
+        }
+
+        if (filter === "following") {
+            if (!userId) {
+                res.status(401).json({
+                    success: false,
+                    error: "Vui lòng đăng nhập để xem bài viết của những người đang theo dõi!"
+                });
+                return;
+            }
+            const user = await User.findById(userId).select("following").lean();
+            const followingUsers = user?.following || [];
+            query.author = { $in: followingUsers };
+        }
+
+        let sortObj: any = { createdAt: -1 };
+        if (filter === "trending") {
+            sortObj = { likesCount: -1, createdAt: -1 };
+        }
+
+        const [posts, total] = await Promise.all([
+            Post.find(query)
+                .sort(sortObj)
+                .skip(offset)
+                .limit(limit)
+                .populate("author", "displayName avatar")
+                .lean(),
+            Post.countDocuments(query)
+        ]);
+
+        const formattedPosts = posts.map((post: any) => {
+            const likesArray = Array.isArray(post.likes) ? post.likes : [];
+            const bookmarksArray = Array.isArray(post.bookmarks) ? post.bookmarks : [];
+
+            const isLiked = userId ? likesArray.some((id: any) => id.toString() === userId.toString()) : false;
+            const isBookmarked = userId ? bookmarksArray.some((id: any) => id.toString() === userId.toString()) : false;
+
+            return {
+                id: post._id,
+                content: post.content,
+                images: post.images || [],
+                author: post.author ? {
+                    id: (post.author as any)._id,
+                    displayName: (post.author as any).displayName,
+                    avatar: (post.author as any).avatar
+                } : null,
+                likes: likesArray.length,
+                comments: post.commentsCount || 0,
+                shares: post.shares || 0,
+                isLiked: isLiked,
+                isBookmarked: isBookmarked,
+                createdAt: post.createdAt
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                posts: formattedPosts,
+                total: total
+            }
+        });
+    } catch (error) {
+        console.error("[Get Social Posts Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy danh sách bài viết!"
+        });
+    }
+};
+
+// [GET] /posts/:postId
+export const getPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { postId } = req.params;
+
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        const post = await Post.findById(postId)
+            .populate("author", "displayName avatar")
+            .lean();
+
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        const likesArray = Array.isArray(post.likes) ? post.likes : [];
+        const bookmarksArray = Array.isArray(post.bookmarks) ? post.bookmarks : [];
+
+        const isLiked = userId ? likesArray.some((id: any) => id.toString() === userId.toString()) : false;
+        const isBookmarked = userId ? bookmarksArray.some((id: any) => id.toString() === userId.toString()) : false;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                id: post._id,
+                content: post.content,
+                images: post.images || [],
+                author: post.author ? {
+                    id: (post.author as any)._id,
+                    displayName: (post.author as any).displayName,
+                    avatar: (post.author as any).avatar
+                } : null,
+                likes: likesArray.length,
+                comments: post.commentsCount || 0,
+                shares: post.shares || 0,
+                isLiked: isLiked,
+                isBookmarked: isBookmarked,
+                createdAt: post.createdAt
+            }
+        });
+    } catch (error) {
+        console.error("[Get Single Social Post Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy thông tin bài viết!"
+        });
+    }
+};
+
+// [POST] /posts
+export const createPost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập để tạo bài viết!"
+            });
+            return;
+        }
+
+        const { content, images } = req.body;
+        if (!content) {
+            res.status(400).json({
+                success: false,
+                error: "Nội dung bài viết không được trống!"
+            });
+            return;
+        }
+
+        const newPost = new Post({
+            content: content.trim(),
+            images: Array.isArray(images) ? images : [],
+            author: userId,
+            likes: [],
+            likesCount: 0,
+            comments: [],
+            commentsCount: 0,
+            bookmarks: [],
+            bookmarksCount: 0,
+            shares: 0
+        });
+
+        await newPost.save();
+
+        const populatedPost = await Post.findById(newPost._id)
+            .populate("author", "displayName avatar")
+            .lean();
+
+        res.status(201).json({
+            success: true,
+            data: {
+                id: populatedPost?._id,
+                content: populatedPost?.content,
+                images: populatedPost?.images || [],
+                author: populatedPost?.author ? {
+                    id: (populatedPost.author as any)._id,
+                    displayName: (populatedPost.author as any).displayName,
+                    avatar: (populatedPost.author as any).avatar
+                } : null,
+                createdAt: populatedPost?.createdAt
+            }
+        });
+    } catch (error) {
+        console.error("[Create Social Post Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi tạo bài viết!"
+        });
+    }
+};
+
+// [DELETE] /posts/:postId
+export const deletePost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { postId } = req.params;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        if (post.author.toString() !== userId.toString()) {
+            res.status(403).json({
+                success: false,
+                error: "Bạn không có quyền xóa bài viết này!"
+            });
+            return;
+        }
+
+        // Xóa tất cả comment thuộc bài viết này trước
+        await Comment.deleteMany({ targetId: postId, targetType: "post" });
+        await post.deleteOne();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                message: "Post deleted"
+            }
+        });
+    } catch (error) {
+        console.error("[Delete Social Post Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi xóa bài viết!"
+        });
+    }
+};
+
+// [POST] /posts/:postId/upload-image
+export const uploadPostImage = async (req: ExtendRequest, res: Response) => {
+    try {
+        const imageUrl = req.body.file as string; 
+        if (!imageUrl) {
+            res.status(400).json({
+                success: false,
+                error: "Không tìm thấy file ảnh tải lên!"
+            });
+            return;
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                url: imageUrl
+            }
+        });
+    } catch (error) {
+        console.error("[Upload Post Image Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi upload ảnh bài viết!"
+        });
+    }
+};
+
+// [POST] /posts/:postId/like
+export const likePost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { postId } = req.params;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        const likesArray = Array.isArray(post.likes) ? post.likes : [];
+        if (likesArray.some(id => id.toString() === userId.toString())) {
+            res.status(200).json({
+                success: true,
+                data: {
+                    liked: true,
+                    likesCount: likesArray.length
+                }
+            });
+            return;
+        }
+
+        const updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            {
+                $addToSet: { likes: userId },
+                $inc: { likesCount: 1 }
+            },
+            { new: true }
+        ).select("likes").lean();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                liked: true,
+                likesCount: updatedPost?.likes?.length || 0
+            }
+        });
+    } catch (error) {
+        console.error("[Like Social Post Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi thích bài viết!"
+        });
+    }
+};
+
+// [DELETE] /posts/:postId/like
+export const unlikePost = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { postId } = req.params;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        const likesArray = Array.isArray(post.likes) ? post.likes : [];
+        if (!likesArray.some(id => id.toString() === userId.toString())) {
+            res.status(200).json({
+                success: true,
+                data: {
+                    liked: false,
+                    likesCount: likesArray.length
+                }
+            });
+            return;
+        }
+
+        const updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            {
+                $pull: { likes: userId },
+                $inc: { likesCount: -1 }
+            },
+            { new: true }
+        ).select("likes").lean();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                liked: false,
+                likesCount: updatedPost?.likes?.length || 0
+            }
+        });
+    } catch (error) {
+        console.error("[Unlike Social Post Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi bỏ thích bài viết!"
+        });
+    }
+};
+
+// [GET] /posts/:postId/is-liked
+export const getPostIsLiked = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { postId } = req.params;
+
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                error: "Vui lòng đăng nhập!"
+            });
+            return;
+        }
+
+        if (!mongoose.isValidObjectId(postId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID bài viết không hợp lệ!"
+            });
+            return;
+        }
+
+        const post = await Post.findById(postId).select("likes").lean();
+        if (!post) {
+            res.status(404).json({
+                success: false,
+                error: "Bài viết không tồn tại!"
+            });
+            return;
+        }
+
+        const likesArray = Array.isArray(post.likes) ? post.likes : [];
+        const isUserLiked = likesArray.some(id => id.toString() === userId.toString());
+
+        res.status(200).json({
+            success: true,
+            data: {
+                isLiked: isUserLiked
+            }
+        });
+    } catch (error) {
+        console.error("[Get Social Post IsLiked Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi kiểm tra lượt thích bài viết!"
+        });
+    }
+};

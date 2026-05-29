@@ -489,3 +489,70 @@ export const getBlogPostsUser = async (req: ExtendRequest, res: Response) => {
         });
     }
 }
+
+// [GET] /api/v1/users/:userId/posts?limit=20&offset=0
+export const getUserPosts = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { userId } = req.params;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const offset = parseInt(req.query.offset as string) || 0;
+        const currentUserId = req.user?.id;
+
+        if (!mongoose.isValidObjectId(userId)) {
+            res.status(400).json({
+                success: false,
+                error: "ID người dùng không hợp lệ!"
+            });
+            return;
+        }
+
+        const [posts, total] = await Promise.all([
+            Post.find({ author: userId, visibility: "public" })
+                .sort({ createdAt: -1 })
+                .skip(offset)
+                .limit(limit)
+                .populate("author", "displayName avatar")
+                .lean(),
+            Post.countDocuments({ author: userId, visibility: "public" })
+        ]);
+
+        const formattedPosts = posts.map((post: any) => {
+            const likesArray = Array.isArray(post.likes) ? post.likes : [];
+            const bookmarksArray = Array.isArray(post.bookmarks) ? post.bookmarks : [];
+
+            const isLiked = currentUserId ? likesArray.some((id: any) => id.toString() === currentUserId.toString()) : false;
+            const isBookmarked = currentUserId ? bookmarksArray.some((id: any) => id.toString() === currentUserId.toString()) : false;
+
+            return {
+                id: post._id,
+                content: post.content,
+                images: post.images || [],
+                author: post.author ? {
+                    id: (post.author as any)._id,
+                    displayName: (post.author as any).displayName,
+                    avatar: (post.author as any).avatar
+                } : null,
+                likes: likesArray.length,
+                comments: post.commentsCount || 0,
+                shares: post.shares || 0,
+                isLiked: isLiked,
+                isBookmarked: isBookmarked,
+                createdAt: post.createdAt
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                posts: formattedPosts,
+                total: total
+            }
+        });
+    } catch (error) {
+        console.error("[Get User Social Posts Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi lấy danh sách bài viết mạng xã hội của người dùng!"
+        });
+    }
+};
