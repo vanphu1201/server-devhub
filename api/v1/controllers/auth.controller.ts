@@ -404,3 +404,258 @@ export const updatePassword = async (req: ExtendRequest, res: Response) => {
     }
 
 }
+
+// [POST] /api/v1/auth/login/github
+export const loginGithub = async (req: Request, res: Response) => {
+    try {
+        const { code } = req.body;
+        if (!code) {
+            res.status(400).json({
+                success: false,
+                error: "Thiếu mã code OAuth từ GitHub!"
+            });
+            return;
+        }
+
+        let email = "user@github.com";
+        let displayName = "GitHub User";
+        let avatar = "";
+
+        const clientId = process.env.GITHUB_CLIENT_ID;
+        const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+
+        // Nếu có cấu hình credentials thực tế thì gọi API của GitHub
+        if (clientId && clientSecret) {
+            try {
+                const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        code: code
+                    })
+                });
+                const tokenData: any = await tokenRes.json();
+                const accessToken = tokenData.access_token;
+
+                if (accessToken) {
+                    const userRes = await fetch("https://api.github.com/user", {
+                        headers: {
+                            "Authorization": `Bearer ${accessToken}`,
+                            "User-Agent": "DevHub-Server"
+                        }
+                    });
+                    const userData: any = await userRes.json();
+                    
+                    displayName = userData.name || userData.login || "GitHub User";
+                    avatar = userData.avatar_url || "";
+                    
+                    // Lấy email từ GitHub
+                    if (userData.email) {
+                        email = userData.email;
+                    } else {
+                        const emailsRes = await fetch("https://api.github.com/user/emails", {
+                            headers: {
+                                "Authorization": `Bearer ${accessToken}`,
+                                "User-Agent": "DevHub-Server"
+                            }
+                        });
+                        const emailsData: any = await emailsRes.json();
+                        if (Array.isArray(emailsData) && emailsData.length > 0) {
+                            const primaryEmail = emailsData.find((e: any) => e.primary) || emailsData[0];
+                            email = primaryEmail.email;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("[GitHub OAuth Fetch Error]:", err);
+            }
+        } else {
+            // Chế độ Mock cho môi trường phát triển khi thiếu API Key
+            console.log("[GitHub OAuth] Đang sử dụng chế độ Mock cho code:", code);
+            email = `github_${code.substring(0, 8)}@example.com`;
+            displayName = `GitHub User ${code.substring(0, 4)}`;
+        }
+
+        // Tìm hoặc tạo mới người dùng
+        let user = await User.findOne({ email: email });
+        if (!user) {
+            // Sinh password ngẫu nhiên cho user OAuth
+            const randomPassword = crypto.randomBytes(16).toString("hex");
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+            
+            // Lấy username từ email
+            const username = email.split("@")[0] + "_" + Math.floor(Math.random() * 1000);
+
+            user = new User({
+                email: email,
+                password: hashedPassword,
+                displayName: displayName,
+                username: username,
+                avatar: avatar,
+                emailVerified: true
+            });
+            await user.save();
+        }
+
+        // Kiểm tra tài khoản có bị khóa
+        if (user.isBanned) {
+            res.status(403).json({
+                success: false,
+                error: "Tài khoản đã bị khóa!"
+            });
+            return;
+        }
+
+        // Tạo JWT Token
+        const payload = {
+            id: user._id,
+            displayName: user.displayName,
+            role: user.role
+        };
+        const token = jwt.sign(payload, JWT_SECRET, {
+            expiresIn: JWT_EXPIRE
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                id: user._id,
+                email: user.email,
+                displayName: user.displayName,
+                token: token
+            }
+        });
+
+    } catch (error) {
+        console.error("[GitHub Login OAuth Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi đăng nhập bằng GitHub!"
+        });
+    }
+};
+
+// [POST] /api/v1/auth/login/google
+export const loginGoogle = async (req: Request, res: Response) => {
+    try {
+        const { code } = req.body;
+        if (!code) {
+            res.status(400).json({
+                success: false,
+                error: "Thiếu mã code OAuth từ Google!"
+            });
+            return;
+        }
+
+        let email = "user@gmail.com";
+        let displayName = "Google User";
+        let avatar = "";
+
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+        const redirectUri = process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/auth/callback/google";
+
+        // Nếu có cấu hình credentials thực tế thì gọi API của Google
+        if (clientId && clientSecret) {
+            try {
+                const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        client_secret: clientSecret,
+                        code: code,
+                        grant_type: "authorization_code",
+                        redirect_uri: redirectUri
+                    })
+                });
+                const tokenData: any = await tokenRes.json();
+                const accessToken = tokenData.access_token;
+
+                if (accessToken) {
+                    const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+                        headers: {
+                            "Authorization": `Bearer ${accessToken}`
+                        }
+                    });
+                    const userData: any = await userRes.json();
+                    
+                    email = userData.email || email;
+                    displayName = userData.name || userData.given_name || "Google User";
+                    avatar = userData.picture || "";
+                }
+            } catch (err) {
+                console.error("[Google OAuth Fetch Error]:", err);
+            }
+        } else {
+            // Chế độ Mock cho môi trường phát triển khi thiếu API Key
+            console.log("[Google OAuth] Đang sử dụng chế độ Mock cho code:", code);
+            email = `google_${code.substring(0, 8)}@gmail.com`;
+            displayName = `Google User ${code.substring(0, 4)}`;
+        }
+
+        // Tìm hoặc tạo mới người dùng
+        let user = await User.findOne({ email: email });
+        if (!user) {
+            // Sinh password ngẫu nhiên cho user OAuth
+            const randomPassword = crypto.randomBytes(16).toString("hex");
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+            
+            // Lấy username từ email
+            const username = email.split("@")[0] + "_" + Math.floor(Math.random() * 1000);
+
+            user = new User({
+                email: email,
+                password: hashedPassword,
+                displayName: displayName,
+                username: username,
+                avatar: avatar,
+                emailVerified: true
+            });
+            await user.save();
+        }
+
+        // Kiểm tra tài khoản có bị khóa
+        if (user.isBanned) {
+            res.status(403).json({
+                success: false,
+                error: "Tài khoản đã bị khóa!"
+            });
+            return;
+        }
+
+        // Tạo JWT Token
+        const payload = {
+            id: user._id,
+            displayName: user.displayName,
+            role: user.role
+        };
+        const token = jwt.sign(payload, JWT_SECRET, {
+            expiresIn: JWT_EXPIRE
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                id: user._id,
+                email: user.email,
+                displayName: user.displayName,
+                token: token
+            }
+        });
+
+    } catch (error) {
+        console.error("[Google Login OAuth Error]:", error);
+        res.status(500).json({
+            success: false,
+            error: "Lỗi hệ thống khi đăng nhập bằng Google!"
+        });
+    }
+};

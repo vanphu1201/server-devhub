@@ -7,6 +7,8 @@ const route: Router = Router();
 
 route.post('/signup', controller.signup);
 route.post('/login', controller.login);
+route.post('/login/github', controller.loginGithub);
+route.post('/login/google', controller.loginGoogle);
 route.post('/forgot-password', controller.forgotPassword);
 route.post('/reset-password', controller.resetPassword);
 route.post('/update-password', requireAuth, controller.updatePassword);
