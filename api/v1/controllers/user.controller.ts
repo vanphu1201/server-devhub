@@ -55,6 +55,7 @@ export const identifier = async (req: Request, res: Response) => {
                 followers: userObj.followers?.length || 0,
                 following: userObj.following?.length || 0,
                 postsCount: postsCount || 0,
+                role: userObj.role || 'user',
                 //productsCount: userObj.productsCount || 0,
                 joinedDate: userObj.createdAt
             }
