@@ -35,5 +35,6 @@ route.get('/:userId/posts', optionalAuth, controller.getUserPosts);
 route.get('/:userId/products', optionalAuth, getUserProducts);
 route.get('/:userId/purchases', requireAuth, getUserPurchases);
 route.get('/:userId/resources/purchases', requireAuth, getUserUnlockedResources);
+route.get('/:userId/badges', optionalAuth, controller.getUserBadges);
 
 export const usersRoute: Router = route;

@@ -7,6 +7,8 @@ import { blogRoute } from "./blog.route";
 import { productsRoute } from "./products.route";
 import { ticketsRoute } from "./tickets.route";
 import { resourcesRoute } from "./resources.route";
+import { statsRoute } from "./stats.route";
+import { searchRoute } from "./search.route";
 
 const mainV1Route = (app: Express): void => {
     const version: string = "/api/v1";
@@ -19,6 +21,8 @@ const mainV1Route = (app: Express): void => {
     app.use(version + '/products', productsRoute);
     app.use(version + '/tickets', ticketsRoute);
     app.use(version + '/resources', resourcesRoute);
+    app.use(version + '/stats', statsRoute);
+    app.use(version + '/search', searchRoute);
 }
 
 export default mainV1Route;

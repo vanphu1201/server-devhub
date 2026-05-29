@@ -5,6 +5,8 @@ import mongoose from "mongoose";
 import { ExtendRequest } from "../../../helpers/extendRequest";
 import BlogPost from "../models/blog_posts.model";
 import BlogSeries from "../models/blog_series.model";
+import Product from "../models/products.model";
+import UserBadge from "../models/user_badges.model";
 
 // [GET] /api/v1/users/:identifier
 export const identifier = async (req: Request, res: Response) => {
@@ -630,5 +632,82 @@ export const getBlogSeriesUser = async (req: ExtendRequest, res: Response) => {
             success: false,
             error: "Lỗi hệ thống khi lấy danh sách series bài viết của người dùng!"
         });
+    }
+};
+
+// [GET] /api/v1/users/:userId/badges
+export const getUserBadges = async (req: ExtendRequest, res: Response) => {
+    try {
+        const { userId } = req.params;
+        if (!mongoose.isValidObjectId(userId)) {
+            res.status(400).json({ success: false, error: "ID người dùng không hợp lệ!" });
+            return;
+        }
+
+        const badges = await UserBadge.find({ user: userId })
+            .populate("badge")
+            .sort({ awardedAt: -1 })
+            .lean();
+
+        const formattedBadges = badges.map((b: any) => ({
+            id: b._id,
+            badge: b.badge ? {
+                id: b.badge._id,
+                name: b.badge.name,
+                icon: b.badge.icon,
+                description: b.badge.description
+            } : null,
+            awardedAt: b.awardedAt
+        }));
+
+        res.status(200).json({
+            success: true,
+            data: formattedBadges
+        });
+
+    } catch (error) {
+        console.error("[Get User Badges Error]: ", error);
+        res.status(500).json({ success: false, error: "Lỗi hệ thống khi lấy danh sách huy hiệu!" });
+    }
+};
+
+// [GET] /api/v1/stats/user
+export const getUserStats = async (req: ExtendRequest, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({ success: false, error: "Vui lòng đăng nhập!" });
+            return;
+        }
+
+        const user = await User.findById(userId).lean();
+        if (!user) {
+            res.status(404).json({ success: false, error: "Người dùng không tồn tại!" });
+            return;
+        }
+
+        const [postsCount, blogPostsCount, productsCount, badgesCount] = await Promise.all([
+            Post.countDocuments({ author: userId }),
+            BlogPost.countDocuments({ author: userId }),
+            Product.countDocuments({ author: userId }),
+            UserBadge.countDocuments({ user: userId })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                reputation: user.reputation || 0,
+                followersCount: user.followers?.length || 0,
+                followingCount: user.following?.length || 0,
+                postsCount: postsCount,
+                blogPostsCount: blogPostsCount,
+                productsCount: productsCount,
+                badgesCount: badgesCount
+            }
+        });
+
+    } catch (error) {
+        console.error("[Get User Stats Error]: ", error);
+        res.status(500).json({ success: false, error: "Lỗi hệ thống khi lấy số liệu thống kê!" });
     }
 };
